@@ -1,7 +1,10 @@
 fastapi
 uvicorn
-pydantic
+pydantic[email]
 supabase
 python-dotenv
 pyjwt
 loguru
+slowapi
+bcrypt
+tzdata
