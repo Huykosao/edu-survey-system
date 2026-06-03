@@ -1,40 +1,38 @@
-from src.models.admin import CreateUserRequest
-from src.schemas.user import NewUser
-from src.repositories.user import create_user
+"""
+services/auth.py
+─────────────────
+Business logic cho xác thực: hash password, tạo token, tạo user mới.
+"""
+
 import bcrypt
+from src.models.user import CreateUserRequest
+from src.schemas.user import NewUserRow
+from src.repositories.user import create_user
+
 
 def hash_password(plain_password: str) -> bytes:
-    """
-    Hash a plain text password using bcrypt.
-    Returns the hashed password as bytes.
-    """
+    """Hash mật khẩu bằng bcrypt."""
     if not isinstance(plain_password, str) or not plain_password:
         raise ValueError("Password must be a non-empty string.")
-    
-    # Generate a salt and hash the password
-    salt = bcrypt.gensalt()  # Automatically generates a secure random salt
-    hashed = bcrypt.hashpw(plain_password.encode('utf-8'), salt)
-    return hashed
+    salt = bcrypt.gensalt()
+    return bcrypt.hashpw(plain_password.encode("utf-8"), salt)
+
 
 def verify_password(plain_password: str, hashed_password: bytes) -> bool:
-    """
-    Verify a plain text password against the stored hashed password.
-    """
+    """Xác minh mật khẩu với hash đã lưu."""
     if not isinstance(plain_password, str) or not plain_password:
         return False
     if not isinstance(hashed_password, bytes):
         return False
-    
-    return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password)
+    return bcrypt.checkpw(plain_password.encode("utf-8"), hashed_password)
 
 
-
-def create_user_services(user: CreateUserRequest):
-    save_user = NewUser(
-        full_name=user.full_name,
-        email=user.email,
-        password_hash=hash_password(user.password).decode('utf-8'),
-        username=(user.email.split("@"))[0]
+def create_user_service(req: CreateUserRequest) -> dict:
+    """Tạo user mới từ request — hash password rồi lưu DB."""
+    new_user = NewUserRow(
+        full_name=req.full_name,
+        email=req.email,
+        password_hash=hash_password(req.password).decode("utf-8"),
+        username=req.email.split("@")[0],
     )
-
-    return create_user(save_user)
+    return create_user(new_user)

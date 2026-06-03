@@ -1,11 +1,11 @@
-from pydantic import BaseModel, Field
-from src.share.types import ValidEmail
+"""
+models/admin.py
+────────────────
+Giữ lại alias ngắn để không vỡ import cũ.
+Các models chính đã chuyển qua models/user.py.
+"""
 
-class CreateUserRequest(BaseModel):
-    password: str
-    email: ValidEmail = Field(..., max_length=255)
-    full_name: str = Field(..., max_length=255)
-    role_ids: list[int] | None = None
+from src.models.user import CreateUserRequest, BulkCreateUserRequest
 
-class BulkCreateUser(BaseModel):
-    users: list[CreateUserRequest]
+# Alias tương thích ngược
+BulkCreateUser = BulkCreateUserRequest
