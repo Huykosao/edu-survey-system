@@ -24,7 +24,10 @@ def verify_password(plain_password: str, hashed_password: bytes) -> bool:
         return False
     if not isinstance(hashed_password, bytes):
         return False
-    return bcrypt.checkpw(plain_password.encode("utf-8"), hashed_password)
+    try:
+        return bcrypt.checkpw(plain_password.encode("utf-8"), hashed_password)
+    except ValueError:
+        return False
 
 
 def create_user_service(req: CreateUserRequest) -> dict:

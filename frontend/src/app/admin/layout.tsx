@@ -43,9 +43,9 @@ export default function AdminLayout({
       const managerOnlyPaths = ["/admin/surveys", "/admin/clarifications", "/admin/approvals", "/admin/reports"];
       const lecturerOnlyPaths = ["/admin/my-clarifications"];
 
-      const isTryingAdminPath = adminOnlyPaths.some(path => pathname === path || (pathname && pathname.startsWith(path + "/")));
-      const isTryingManagerPath = managerOnlyPaths.some(path => pathname === path || (pathname && pathname.startsWith(path + "/")));
-      const isTryingLecturerPath = lecturerOnlyPaths.some(path => pathname === path || (pathname && pathname.startsWith(path + "/")));
+      const isTryingAdminPath = adminOnlyPaths.some(path => pathname === path || pathname?.startsWith(path + "/"));
+      const isTryingManagerPath = managerOnlyPaths.some(path => pathname === path || pathname?.startsWith(path + "/"));
+      const isTryingLecturerPath = lecturerOnlyPaths.some(path => pathname === path || pathname?.startsWith(path + "/"));
 
       if (isTryingAdminPath && !hasAdmin) {
         router.push("/403");
@@ -282,7 +282,7 @@ export default function AdminLayout({
         <aside className="fixed left-0 top-16 bottom-0 w-[260px] bg-surface-container-lowest border-r border-outline-variant/30 hidden md:flex flex-col py-4 px-3 z-40">
           <nav className="flex-1 flex flex-col gap-1">
             {menuItems.map((item) => {
-              const isActive = pathname === item.path || (item.path !== "/admin" && pathname.startsWith(item.path));
+              const isActive = pathname === item.path || (item.path !== "/admin" && pathname?.startsWith(item.path));
               return (
                 <Link
                   key={item.path}
@@ -337,7 +337,7 @@ export default function AdminLayout({
             <aside className="fixed left-0 top-16 bottom-0 w-[280px] bg-surface-container-lowest border-r border-outline-variant/30 flex flex-col py-4 px-3 z-40 md:hidden shadow-2xl">
               <nav className="flex-grow flex flex-col gap-1">
                 {menuItems.map((item) => {
-                  const isActive = pathname === item.path || (item.path !== "/admin" && pathname.startsWith(item.path));
+                  const isActive = pathname === item.path || (item.path !== "/admin" && pathname?.startsWith(item.path));
                   return (
                     <Link
                       key={item.path}
