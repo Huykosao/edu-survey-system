@@ -75,5 +75,6 @@ def get_current_user(
     if user.get("status") == "locked":
         raise HTTPException(status_code=403, detail="Tài khoản đã bị khóa")
 
+    # Đính kèm danh sách roles từ token payload vào user dict
     user["roles"] = payload.get("roles", [])
     return user

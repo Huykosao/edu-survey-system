@@ -81,7 +81,7 @@ def update_user_info(user_id: int, data: dict) -> dict:
 
 
 def get_profile(current_user: dict) -> dict:
-    roles = get_user_roles(current_user["id"])
+    roles = current_user.get("roles", [])
     return sanitize_user(current_user, roles)
 
 
