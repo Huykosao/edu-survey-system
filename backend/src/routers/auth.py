@@ -32,15 +32,15 @@ def login(login_req: LoginRequest):
     if not user:
         raise HTTPException(status_code=401, detail="Email hoặc mật khẩu không đúng")
 
-    if user.get("status") == "locked":
-        raise HTTPException(status_code=403, detail="Tài khoản đã bị khóa. Liên hệ Admin để mở khóa.")
-
     stored_hash = user.get("password_hash", "")
     if isinstance(stored_hash, str):
         stored_hash = stored_hash.encode("utf-8")
 
     if not verify_password(login_req.password, stored_hash):
         raise HTTPException(status_code=401, detail="Email hoặc mật khẩu không đúng")
+
+    if user.get("status") == "locked":
+        raise HTTPException(status_code=403, detail="Tài khoản đã bị khóa. Liên hệ Admin để mở khóa.")
 
     roles = get_user_roles(user["id"])
     update_last_login(user["id"])

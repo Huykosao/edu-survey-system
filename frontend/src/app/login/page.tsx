@@ -53,10 +53,7 @@ export default function LoginPage() {
     const result = await login(email, password);
     setIsLoading(false);
 
-    if (result.success) {
-      // Fetch fresh user data just in case and redirect
-      redirectUser(user);
-    } else {
+    if (!result.success) {
       setError(result.error || "Đăng nhập thất bại");
     }
   };

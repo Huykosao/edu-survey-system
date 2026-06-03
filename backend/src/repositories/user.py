@@ -33,10 +33,17 @@ def get_user_by_email(email: str) -> dict | None:
     return result.data[0] if result.data else None
 
 
-def list_users(status: str | None, page: int, limit: int) -> tuple[list[dict], int]:
+def list_users(
+    status: str | None, 
+    page: int, 
+    limit: int, 
+    user_ids: list[int] | None = None
+) -> tuple[list[dict], int]:
     query = supabase_client.table("users").select("*", count="exact")
     if status:
         query = query.eq("status", status)
+    if user_ids is not None:
+        query = query.in_("id", user_ids)
     offset = (page - 1) * limit
     result = query.range(offset, offset + limit - 1).order("created_at", desc=True).execute()
     return result.data or [], result.count or 0

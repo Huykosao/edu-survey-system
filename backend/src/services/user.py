@@ -13,7 +13,12 @@ from src.repositories.user import (
     get_profile_details,
     upsert_profile_details,
 )
-from src.repositories.role import get_user_roles, set_user_roles
+from src.repositories.role import (
+    get_user_roles,
+    set_user_roles,
+    get_user_ids_by_role,
+    get_users_roles,
+)
 from fastapi import HTTPException
 
 
@@ -33,13 +38,23 @@ def sanitize_user(user: dict, roles: list[str]) -> dict:
 
 def get_users_list(role_filter: str | None, status: str | None, page: int, limit: int) -> dict:
     """Lấy danh sách users có filter và phân trang."""
-    users_raw, total = list_users(status, page, limit)
+    user_ids = None
+    if role_filter:
+        user_ids = get_user_ids_by_role(role_filter)
+        if not user_ids:
+            return {"data": [], "total": 0}
+
+    users_raw, total = list_users(status, page, limit, user_ids=user_ids)
+
+    # N+1 query fix: fetch all roles in one query
+    retrieved_user_ids = [u["id"] for u in users_raw]
+    roles_by_user = get_users_roles(retrieved_user_ids)
+
     users_with_roles = []
     for u in users_raw:
-        roles = get_user_roles(u["id"])
-        if role_filter and role_filter not in roles:
-            continue
+        roles = roles_by_user.get(u["id"], [])
         users_with_roles.append(sanitize_user(u, roles))
+
     return {"data": users_with_roles, "total": total}
 
 
