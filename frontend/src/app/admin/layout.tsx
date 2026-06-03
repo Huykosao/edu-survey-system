@@ -43,9 +43,9 @@ export default function AdminLayout({
       const managerOnlyPaths = ["/admin/surveys", "/admin/clarifications", "/admin/approvals", "/admin/reports"];
       const lecturerOnlyPaths = ["/admin/my-clarifications"];
 
-      const isTryingAdminPath = adminOnlyPaths.some(path => pathname === path || pathname.startsWith(path + "/"));
-      const isTryingManagerPath = managerOnlyPaths.some(path => pathname === path || pathname.startsWith(path + "/"));
-      const isTryingLecturerPath = lecturerOnlyPaths.some(path => pathname === path || pathname.startsWith(path + "/"));
+      const isTryingAdminPath = adminOnlyPaths.some(path => pathname === path || (pathname && pathname.startsWith(path + "/")));
+      const isTryingManagerPath = managerOnlyPaths.some(path => pathname === path || (pathname && pathname.startsWith(path + "/")));
+      const isTryingLecturerPath = lecturerOnlyPaths.some(path => pathname === path || (pathname && pathname.startsWith(path + "/")));
 
       if (isTryingAdminPath && !hasAdmin) {
         router.push("/403");
