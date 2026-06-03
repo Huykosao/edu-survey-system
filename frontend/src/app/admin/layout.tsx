@@ -49,9 +49,9 @@ export default function AdminLayout({
 
       if (isTryingAdminPath && !hasAdmin) {
         router.push("/403");
-      } else if (isTryingManagerPath && !hasManager) {
+      } else if (isTryingManagerPath && !hasManager && !hasAdmin) {
         router.push("/403");
-      } else if (isTryingLecturerPath && !hasLecturer) {
+      } else if (isTryingLecturerPath && !hasLecturer && !hasAdmin) {
         router.push("/403");
       }
     }
