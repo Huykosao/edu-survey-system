@@ -19,9 +19,9 @@ router = APIRouter(
 @router.get("/dashboard/overview", response_model=DashboardOverviewResponse)
 def dashboard_overview(_: dict = Depends(get_current_user)):
     """Thống kê tổng quan hệ thống. [Mọi user đã đăng nhập]"""
-    users = supabase_client.table("users").select("id", count="exact").execute()
-    surveys = supabase_client.table("surveys").select("id", count="exact").execute()
-    responses = supabase_client.table("survey_responses").select("id", count="exact").execute()
+    users = supabase_client.table("users").select("id", count="exact").limit(1).execute()
+    surveys = supabase_client.table("surveys").select("id", count="exact").limit(1).execute()
+    responses = supabase_client.table("survey_responses").select("id", count="exact").limit(1).execute()
     return {
         "total_users": users.count or 0,
         "total_surveys": surveys.count or 0,
