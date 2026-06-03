@@ -29,10 +29,10 @@ def get_user_roles(user_id: int) -> list[str]:
 def set_user_roles(user_id: int, role_ids: list[int]) -> None:
     """Thay thế toàn bộ roles của user."""
     supabase_client.table("user_roles").delete().eq("user_id", user_id).execute()
-    for role_id in role_ids:
-        supabase_client.table("user_roles").insert(
-            {"user_id": user_id, "role_id": role_id}
-        ).execute()
+    if role_ids:
+        supabase_client.table("user_roles").insert([
+            {"user_id": user_id, "role_id": role_id} for role_id in role_ids
+        ]).execute()
 
 
 def get_user_ids_by_role(role_name: str) -> list[int]:
