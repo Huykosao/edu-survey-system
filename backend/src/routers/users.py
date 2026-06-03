@@ -95,7 +95,10 @@ def change_user_status(
     _: dict = Depends(require_admin),
 ):
     """Khóa / mở khóa tài khoản user. [ADMIN]"""
-    return update_user_status(user_id, req.status)
+    updated_user = update_user_status(user_id, req.status)
+    roles = get_user_roles(user_id)
+    from src.services.user import sanitize_user
+    return sanitize_user(updated_user, roles)
 
 
 # ── User Roles ────────────────────────────────────────────────────────────────
