@@ -156,7 +156,7 @@ export default function AdminLayout({
     );
   }
 
-  if (!isAuthenticated) {
+  if (!isAuthenticated || !isAuthorized) {
     return null;
   }
 
