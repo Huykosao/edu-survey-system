@@ -195,7 +195,7 @@ CREATE TABLE public.lecturer_responses_to_students (
 -- Manager đăng thông báo về những gì trường đã cải thiện sau khảo sát
 CREATE TABLE public.improvement_announcements (
     id SERIAL PRIMARY KEY,
-    survey_id INT REFERENCES public.surveys(id),
+    survey_id INT REFERENCES public.surveys(id) ON DELETE CASCADE,
     title VARCHAR(255),
     content TEXT,
     target_roles JSONB, -- [STUDENT, ALUMNI, EMPLOYER]

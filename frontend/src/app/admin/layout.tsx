@@ -374,7 +374,9 @@ export default function AdminLayout({
             {/* Show survey board link for student roles or anyone who has it */}
             {(roles.includes("STUDENT") ||
               roles.includes("ALUMNI") ||
-              roles.includes("EMPLOYER")) && (
+              roles.includes("EMPLOYER") ||
+              roles.includes("LECTURER") ||
+              roles.includes("MANAGER")) && (
               <Link
                 href="/survey"
                 className="flex items-center gap-3 px-3 h-11 rounded-xl text-on-surface-variant hover:bg-surface-container-low transition-all duration-150"
@@ -440,7 +442,9 @@ export default function AdminLayout({
               <div className="border-t border-outline-variant/20 pt-3 flex flex-col gap-1">
                 {(roles.includes("STUDENT") ||
                   roles.includes("ALUMNI") ||
-                  roles.includes("EMPLOYER")) && (
+                  roles.includes("EMPLOYER") ||
+                  roles.includes("LECTURER") ||
+                  roles.includes("MANAGER")) && (
                   <Link
                     href="/survey"
                     onClick={() => setMobileMenuOpen(false)}

@@ -80,7 +80,9 @@ def list_pending_lecturer_responses() -> list[dict]:
 def list_published_lecturer_responses() -> list[dict]:
     result = (
         supabase_client.table("lecturer_responses_to_students")
-        .select("*, survey_clarifications(surveys(title), users(full_name))")
+        # Dùng tên FK rõ ràng vì survey_clarifications có 2 FK đến users
+        # (lecturer_id và requested_by) — PostgREST cần biết join qua cái nào
+        .select("*, survey_clarifications(surveys(title), users!survey_clarifications_lecturer_id_fkey(full_name))")
         .eq("is_published", True)
         .execute()
     )
