@@ -67,9 +67,12 @@ def get_user(user_id: int, _: dict = Depends(require_manager)):
 def create_user(req: CreateUserRequest, current_user: dict = Depends(require_admin)):
     """Tạo user mới. [ADMIN]"""
     new_user = create_user_service(req)
+    roles = []
     if req.role_ids:
         set_user_roles(new_user["id"], req.role_ids)
-    return new_user
+        roles = get_user_roles(new_user["id"])
+    from src.services.user import sanitize_user
+    return sanitize_user(new_user, roles)
 
 
 @router.put("/users/{user_id}", response_model=MessageResponse)
