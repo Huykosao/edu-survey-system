@@ -20,6 +20,7 @@ from src.routers.clarifications import router as clarifications_router
 from src.routers.notifications import router as notifications_router
 from src.routers.dashboard import router as dashboard_router
 from src.routers.improvements import router as improvements_router
+from src.routers.allowed_domains import router as allowed_domains_router
 
 app = FastAPI(
     title="Edu Survey System API",
@@ -46,6 +47,7 @@ app.include_router(clarifications_router)# /api/clarifications/*, /api/responses
 app.include_router(notifications_router) # /api/notifications/*
 app.include_router(dashboard_router)     # /api/dashboard/overview, /api/system-logs
 app.include_router(improvements_router)  # /api/improvements/*
+app.include_router(allowed_domains_router) # /api/allowed-domains/*
 
 
 @app.get("/")

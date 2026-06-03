@@ -36,6 +36,6 @@ def create_user_service(req: CreateUserRequest) -> dict:
         full_name=req.full_name,
         email=req.email,
         password_hash=hash_password(req.password).decode("utf-8"),
-        username=req.email.split("@")[0],
+        username=req.email[:100],  # Sử dụng toàn bộ email (giới hạn 100 ký tự) làm username để tránh trùng lặp
     )
     return create_user(new_user)
