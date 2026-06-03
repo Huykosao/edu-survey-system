@@ -3,6 +3,7 @@
 import React, { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { usersApi } from "@/lib/api";
 
 interface UserProfile {
   id: string;
@@ -14,49 +15,10 @@ interface UserProfile {
   status: "active" | "locked";
 }
 
-const mockUsers: Record<string, UserProfile> = {
-  "1": {
-    id: "1",
-    name: "Nguyễn Văn Hải",
-    email: "hai.nguyen@university.edu",
-    phone: "0901234567",
-    dept: "Khoa Công nghệ Thông tin",
-    role: "student",
-    status: "active",
-  },
-  "2": {
-    id: "2",
-    name: "Trần Thị Mai",
-    email: "mai.tran@faculty.edu",
-    phone: "0912345678",
-    dept: "Khoa Công nghệ Thông tin",
-    role: "faculty",
-    status: "active",
-  },
-  "3": {
-    id: "3",
-    name: "Lê Văn Đức",
-    email: "duc.le@admin.edu",
-    phone: "0987654321",
-    dept: "Phòng Đào tạo",
-    role: "manager",
-    status: "locked",
-  },
-  "4": {
-    id: "4",
-    name: "Phạm Ngọc Anh",
-    email: "anh.pham@university.edu",
-    phone: "0934567890",
-    dept: "Khoa Kinh tế",
-    role: "student",
-    status: "active",
-  },
-};
-
 function EditUserForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const userId = searchParams.get("id") || "2"; // Default to Tran Thi Mai
+  const userId = searchParams.get("id");
 
   const [profile, setProfile] = useState<UserProfile>({
     id: "2",
@@ -71,32 +33,75 @@ function EditUserForm() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
 
-  // Load mock data on init
+  const [loading, setLoading] = useState(true);
+
+  // Load real data on init
   useEffect(() => {
-    if (mockUsers[userId]) {
-      setProfile(mockUsers[userId]);
-    }
+    if (!userId) return;
+    setLoading(true);
+    usersApi.get(parseInt(userId))
+      .then((res: any) => {
+        let r = "student";
+        if (res.roles && res.roles.length > 0) {
+          if (res.roles[0] === "ADMIN") r = "admin";
+          else if (res.roles[0] === "MANAGER") r = "manager";
+          else if (res.roles[0] === "LECTURER") r = "faculty";
+        }
+        setProfile({
+          id: res.id.toString(),
+          name: res.full_name,
+          email: res.email,
+          phone: "0900000000",
+          dept: "Chưa cập nhật",
+          role: r as any,
+          status: res.status === "active" ? "active" : "locked",
+        });
+      })
+      .catch((err) => console.error("Error loading user details:", err))
+      .finally(() => setLoading(false));
   }, [userId]);
 
-  const handleSave = () => {
-    setToastMessage("Đã lưu các thay đổi của người dùng thành công!");
-    setTimeout(() => {
-      setToastMessage("");
-      router.push("/admin/users");
-    }, 1500);
+  const handleSave = async () => {
+    if (!userId) return;
+    try {
+      let role_id = 1;
+      if (profile.role === "admin") role_id = 4;
+      else if (profile.role === "manager") role_id = 3;
+      else if (profile.role === "faculty") role_id = 2;
+
+      await usersApi.update(parseInt(userId), {
+        full_name: profile.name,
+        role_ids: [role_id],
+        status: profile.status === "active" ? "active" : "inactive"
+      });
+
+      setToastMessage("Đã lưu các thay đổi của người dùng thành công!");
+      setTimeout(() => {
+        setToastMessage("");
+        router.push("/admin/users");
+      }, 1500);
+    } catch (err) {
+      console.error("Error saving user:", err);
+    }
   };
 
   const handleCancel = () => {
     router.push("/admin/users");
   };
 
-  const handleDelete = () => {
-    setToastMessage("Tài khoản người dùng đã bị xóa vĩnh viễn.");
-    setShowDeleteConfirm(false);
-    setTimeout(() => {
-      setToastMessage("");
-      router.push("/admin/users");
-    }, 1500);
+  const handleDelete = async () => {
+    if (!userId) return;
+    try {
+      await usersApi.delete(parseInt(userId));
+      setToastMessage("Tài khoản người dùng đã bị xóa vĩnh viễn.");
+      setShowDeleteConfirm(false);
+      setTimeout(() => {
+        setToastMessage("");
+        router.push("/admin/users");
+      }, 1500);
+    } catch (err) {
+      console.error("Error deleting user:", err);
+    }
   };
 
   return (
@@ -140,6 +145,11 @@ function EditUserForm() {
       </div>
 
       {/* Content Grid */}
+      {loading ? (
+        <div className="flex justify-center items-center py-20">
+          <span className="material-symbols-outlined text-4xl text-primary animate-spin">sync</span>
+        </div>
+      ) : (
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-lg items-start mt-md">
         {/* Main Form Area */}
         <div className="lg:col-span-2 space-y-lg">
@@ -323,6 +333,7 @@ function EditUserForm() {
           </div>
         </div>
       </div>
+      )}
 
       {/* Delete Confirmation Modal */}
       {showDeleteConfirm && (

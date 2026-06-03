@@ -1,6 +1,11 @@
-from pydantic import BaseModel
-from src.share.types import ValidEmail
+from pydantic import BaseModel, EmailStr
+
 
 class LoginRequest(BaseModel):
-    email: ValidEmail
+    email: EmailStr
     password: str
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str

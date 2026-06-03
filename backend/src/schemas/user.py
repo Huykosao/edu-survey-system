@@ -33,7 +33,7 @@ class NewUser(BaseModel):
     password_hash: str
     email: ValidEmail = Field(..., max_length=255)
     full_name: str = Field(..., max_length=255)
-    last_login: datetime = current_time
-    created_at: datetime = current_time
-    updated_at: datetime = current_time
+    last_login: datetime = Field(default_factory=time.get_current_timestamptz)
+    created_at: datetime = Field(default_factory=time.get_current_timestamptz)
+    updated_at: datetime = Field(default_factory=time.get_current_timestamptz)
     

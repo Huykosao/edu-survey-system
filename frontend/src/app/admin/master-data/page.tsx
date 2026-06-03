@@ -1,8 +1,10 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { facultiesApi, majorsApi, classesApi, subjectsApi } from "@/lib/api";
 
 interface DeptRow {
+  id?: number;
   code: string;
   name: string;
   head: string;
@@ -10,6 +12,7 @@ interface DeptRow {
 }
 
 interface MajorRow {
+  id?: number;
   code: string;
   name: string;
   dept: string;
@@ -17,6 +20,7 @@ interface MajorRow {
 }
 
 interface ClassRow {
+  id?: number;
   code: string;
   name: string;
   major: string;
@@ -24,6 +28,7 @@ interface ClassRow {
 }
 
 interface SubjectRow {
+  id?: number;
   code: string;
   name: string;
   credits: number;
@@ -34,6 +39,15 @@ export default function MasterDataPage() {
   const [activeTab, setActiveTab] = useState<"khoa" | "nganh" | "lop" | "mon">("khoa");
   const [searchQuery, setSearchQuery] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 10;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeTab, searchQuery]);
 
   // Form states for adding new Dept
   const [newDeptCode, setNewDeptCode] = useState("");
@@ -41,52 +55,158 @@ export default function MasterDataPage() {
   const [newDeptHead, setNewDeptHead] = useState("");
 
   // Initial Data
-  const [depts, setDepts] = useState<DeptRow[]>([
-    { code: "KHMT", name: "Khoa Khoa học Máy tính", head: "TS. Alan Turing", status: "Active" },
-    { code: "TOAN", name: "Khoa Toán học", head: "TS. Katherine Johnson", status: "Active" },
-    { code: "VATLY", name: "Khoa Vật lý kỹ thuật", head: "TS. Marie Curie", status: "Inactive" },
-    { code: "ANHVĂN", name: "Khoa Ngôn ngữ Anh", head: "GS. John Keating", status: "Active" },
-  ]);
+  const [depts, setDepts] = useState<DeptRow[]>([]);
+  const [majors, setMajors] = useState<MajorRow[]>([]);
+  const [classes, setClasses] = useState<ClassRow[]>([]);
+  const [subjects, setSubjects] = useState<SubjectRow[]>([]);
 
-  const [majors, setMajors] = useState<MajorRow[]>([
-    { code: "KTPM", name: "Kỹ thuật Phần mềm", dept: "Khoa Khoa học Máy tính", status: "Active" },
-    { code: "HTTT", name: "Hệ thống Thông tin", dept: "Khoa Khoa học Máy tính", status: "Active" },
-    { code: "TUD", name: "Toán Ứng dụng", dept: "Khoa Toán học", status: "Active" },
-    { code: "VLHN", name: "Vật lý Hạt nhân", dept: "Khoa Vật lý kỹ thuật", status: "Inactive" },
-  ]);
+  useEffect(() => {
+    const loadData = async () => {
+      setLoading(true);
+      try {
+        if (activeTab === "khoa") {
+          const res = await facultiesApi.list();
+          setDepts((res as any[]).map(f => ({
+            id: f.id,
+            code: f.id.toString(), // or f.code if exists
+            name: f.name,
+            head: f.dean_id ? `User #${f.dean_id}` : "Chưa cập nhật",
+            status: "Active"
+          })));
+        } else if (activeTab === "nganh") {
+          const res = await majorsApi.list();
+          setMajors((res as any[]).map(m => ({
+            id: m.id,
+            code: m.id.toString(),
+            name: m.name,
+            dept: m.faculty_id ? `Khoa #${m.faculty_id}` : "Chưa cập nhật",
+            status: "Active"
+          })));
+        } else if (activeTab === "lop") {
+          const res = await classesApi.list();
+          setClasses((res as any[]).map(c => ({
+            id: c.id,
+            code: c.id.toString(),
+            name: c.name,
+            major: c.major_id ? `Ngành #${c.major_id}` : "Chưa cập nhật",
+            advisor: "Chưa cập nhật"
+          })));
+        } else if (activeTab === "mon") {
+          const res = await subjectsApi.list();
+          setSubjects((res as any[]).map(s => ({
+            id: s.id,
+            code: s.code || s.id.toString(),
+            name: s.name,
+            credits: s.credits || 0,
+            dept: s.faculty_id ? `Khoa #${s.faculty_id}` : "Chưa cập nhật"
+          })));
+        }
+      } catch (err: any) {
+        if (err?.message !== "Failed to fetch") {
+          console.error("Error loading master data:", err);
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadData();
+  }, [activeTab]);
 
-  const [classes, setClasses] = useState<ClassRow[]>([
-    { code: "KTPM-K18A", name: "Lớp Kỹ thuật Phần mềm K18A", major: "Kỹ thuật Phần mềm", advisor: "ThS. Nguyễn Văn Hải" },
-    { code: "HTTT-K18B", name: "Lớp Hệ thống Thông tin K18B", major: "Hệ thống Thông tin", advisor: "TS. Trần Thị Mai" },
-    { code: "TUD-K17A", name: "Lớp Toán Ứng dụng K17A", major: "Toán Ứng dụng", advisor: "GS. Ngô Bảo Châu" },
-  ]);
-
-  const [subjects, setSubjects] = useState<SubjectRow[]>([
-    { code: "CS101", name: "Nhập môn Lập trình", credits: 3, dept: "Khoa Khoa học Máy tính" },
-    { code: "CS102", name: "Cấu trúc Dữ liệu và Giải thuật", credits: 4, dept: "Khoa Khoa học Máy tính" },
-    { code: "MATH201", name: "Giải tích 1", credits: 3, dept: "Khoa Toán học" },
-    { code: "PHYS101", name: "Vật lý Đại cương 1", credits: 3, dept: "Khoa Vật lý kỹ thuật" },
-  ]);
-
-  const handleDeleteDept = (code: string) => {
-    setDepts(depts.filter((item) => item.code !== code));
+  const handleDeleteDept = async (id?: number) => {
+    if (!id) return;
+    try {
+      await facultiesApi.delete(id);
+      setDepts(depts.filter((item) => item.id !== id));
+    } catch (err) {
+      console.error("Error deleting dept:", err);
+    }
   };
 
-  const handleAddDept = (e: React.FormEvent) => {
+  const handleAddDept = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newDeptCode || !newDeptName) return;
-    const newDept: DeptRow = {
-      code: newDeptCode,
-      name: newDeptName,
-      head: newDeptHead || "Chưa cập nhật",
-      status: "Active",
-    };
-    setDepts([...depts, newDept]);
-    // Reset form & close
-    setNewDeptCode("");
-    setNewDeptName("");
-    setNewDeptHead("");
-    setShowAddModal(false);
+    if (!newDeptName) return;
+    try {
+      await facultiesApi.create({ name: newDeptName });
+      // Reset form & close
+      setNewDeptCode("");
+      setNewDeptName("");
+      setNewDeptHead("");
+      setShowAddModal(false);
+      // Reload faculties
+      setActiveTab("khoa");
+      const res = await facultiesApi.list();
+      setDepts((res as any[]).map(f => ({
+        id: f.id,
+        code: f.id.toString(),
+        name: f.name,
+        head: f.dean_id ? `User #${f.dean_id}` : "Chưa cập nhật",
+        status: "Active"
+      })));
+    } catch (err) {
+      console.error("Error creating dept:", err);
+    }
+  };
+
+  // Delete handlers for all tabs
+  const handleDeleteMajor = async (id?: number) => {
+    if (!id) return;
+    try {
+      await majorsApi.delete(id);
+      setMajors(majors.filter(m => m.id !== id));
+    } catch (err) { console.error("Error deleting major:", err); }
+  };
+
+  const handleDeleteClass = async (id?: number) => {
+    if (!id) return;
+    try {
+      await classesApi.delete(id);
+      setClasses(classes.filter(c => c.id !== id));
+    } catch (err) { console.error("Error deleting class:", err); }
+  };
+
+  const handleDeleteSubject = async (id?: number) => {
+    if (!id) return;
+    try {
+      await subjectsApi.delete(id);
+      setSubjects(subjects.filter(s => s.id !== id));
+    } catch (err) { console.error("Error deleting subject:", err); }
+  };
+
+  // Edit handlers (inline edit via prompt for simplicity)
+  const handleEditDept = async (row: DeptRow) => {
+    const newName = prompt("Nhập tên khoa mới:", row.name);
+    if (!newName || !row.id) return;
+    try {
+      await facultiesApi.update(row.id, { name: newName });
+      setDepts(depts.map(d => d.id === row.id ? { ...d, name: newName } : d));
+    } catch (err) { console.error("Error updating dept:", err); }
+  };
+
+  const handleEditMajor = async (row: MajorRow) => {
+    const newName = prompt("Nhập tên ngành mới:", row.name);
+    if (!newName || !row.id) return;
+    try {
+      await majorsApi.update(row.id, { name: newName });
+      setMajors(majors.map(m => m.id === row.id ? { ...m, name: newName } : m));
+    } catch (err) { console.error("Error updating major:", err); }
+  };
+
+  const handleEditClass = async (row: ClassRow) => {
+    const newName = prompt("Nhập tên lớp mới:", row.name);
+    if (!newName || !row.id) return;
+    try {
+      await classesApi.update(row.id, { name: newName });
+      setClasses(classes.map(c => c.id === row.id ? { ...c, name: newName } : c));
+    } catch (err) { console.error("Error updating class:", err); }
+  };
+
+  const handleEditSubject = async (row: SubjectRow) => {
+    const newName = prompt("Nhập tên môn học mới:", row.name);
+    if (!newName || !row.id) return;
+    try {
+      await subjectsApi.update(row.id, { name: newName });
+      setSubjects(subjects.map(s => s.id === row.id ? { ...s, name: newName } : s));
+    } catch (err) { console.error("Error updating subject:", err); }
   };
 
   // Filtering based on tab and query
@@ -96,6 +216,7 @@ export default function MasterDataPage() {
       d.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       d.head.toLowerCase().includes(searchQuery.toLowerCase())
   );
+  const paginatedDepts = filteredDepts.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
   const filteredMajors = majors.filter(
     (m) =>
@@ -103,6 +224,7 @@ export default function MasterDataPage() {
       m.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       m.dept.toLowerCase().includes(searchQuery.toLowerCase())
   );
+  const paginatedMajors = filteredMajors.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
   const filteredClasses = classes.filter(
     (c) =>
@@ -111,6 +233,7 @@ export default function MasterDataPage() {
       c.major.toLowerCase().includes(searchQuery.toLowerCase()) ||
       c.advisor.toLowerCase().includes(searchQuery.toLowerCase())
   );
+  const paginatedClasses = filteredClasses.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
   const filteredSubjects = subjects.filter(
     (s) =>
@@ -118,6 +241,10 @@ export default function MasterDataPage() {
       s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       s.dept.toLowerCase().includes(searchQuery.toLowerCase())
   );
+  const paginatedSubjects = filteredSubjects.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+
+  const activeDataList = activeTab === "khoa" ? filteredDepts : activeTab === "nganh" ? filteredMajors : activeTab === "lop" ? filteredClasses : filteredSubjects;
+  const totalPages = Math.max(1, Math.ceil(activeDataList.length / ITEMS_PER_PAGE));
 
   return (
     <div className="flex flex-col gap-lg animate-in fade-in duration-300">
@@ -218,14 +345,21 @@ export default function MasterDataPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-outline-variant">
-                {filteredDepts.length === 0 ? (
+                {loading ? (
+                  <tr>
+                    <td colSpan={5} className="py-xl text-center text-on-surface-variant font-body-md">
+                      <span className="material-symbols-outlined text-3xl text-primary animate-spin inline-block align-middle mr-2">sync</span>
+                      Đang tải dữ liệu...
+                    </td>
+                  </tr>
+                ) : paginatedDepts.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="py-xl text-center text-on-surface-variant font-body-md">
                       Không tìm thấy khoa nào khớp với từ khóa tìm kiếm.
                     </td>
                   </tr>
                 ) : (
-                  filteredDepts.map((row) => (
+                  paginatedDepts.map((row) => (
                     <tr key={row.code} className="hover:bg-surface-bright transition-colors group">
                       <td className="py-md px-md font-body-md text-body-md text-on-surface font-semibold">{row.code}</td>
                       <td className="py-md px-md font-body-md text-body-md font-medium text-primary">{row.name}</td>
@@ -241,11 +375,11 @@ export default function MasterDataPage() {
                       </td>
                       <td className="py-md px-md text-right">
                         <div className="flex items-center justify-end gap-sm opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button className="text-on-surface-variant hover:text-primary hover:bg-surface-container p-1 rounded transition-colors cursor-pointer" title="Chỉnh sửa">
+                          <button onClick={() => handleEditDept(row)} className="text-on-surface-variant hover:text-primary hover:bg-surface-container p-1 rounded transition-colors cursor-pointer" title="Chỉnh sửa">
                             <span className="material-symbols-outlined text-[20px]">edit</span>
                           </button>
                           <button
-                            onClick={() => handleDeleteDept(row.code)}
+                            onClick={() => handleDeleteDept(row.id)}
                             className="text-on-surface-variant hover:text-error hover:bg-error-container/20 p-1 rounded transition-colors cursor-pointer"
                             title="Xóa"
                           >
@@ -272,14 +406,21 @@ export default function MasterDataPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-outline-variant">
-                {filteredMajors.length === 0 ? (
+                {loading ? (
+                  <tr>
+                    <td colSpan={5} className="py-xl text-center text-on-surface-variant font-body-md">
+                      <span className="material-symbols-outlined text-3xl text-primary animate-spin inline-block align-middle mr-2">sync</span>
+                      Đang tải dữ liệu...
+                    </td>
+                  </tr>
+                ) : paginatedMajors.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="py-xl text-center text-on-surface-variant font-body-md">
                       Không tìm thấy ngành nào khớp với từ khóa tìm kiếm.
                     </td>
                   </tr>
                 ) : (
-                  filteredMajors.map((row) => (
+                  paginatedMajors.map((row) => (
                     <tr key={row.code} className="hover:bg-surface-bright transition-colors group">
                       <td className="py-md px-md font-body-md text-body-md text-on-surface font-semibold">{row.code}</td>
                       <td className="py-md px-md font-body-md text-body-md font-medium text-primary">{row.name}</td>
@@ -295,10 +436,10 @@ export default function MasterDataPage() {
                       </td>
                       <td className="py-md px-md text-right">
                         <div className="flex items-center justify-end gap-sm opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button className="text-on-surface-variant hover:text-primary hover:bg-surface-container p-1 rounded transition-colors cursor-pointer" title="Chỉnh sửa">
+                          <button onClick={() => handleEditMajor(row)} className="text-on-surface-variant hover:text-primary hover:bg-surface-container p-1 rounded transition-colors cursor-pointer" title="Chỉnh sửa">
                             <span className="material-symbols-outlined text-[20px]">edit</span>
                           </button>
-                          <button className="text-on-surface-variant hover:text-error hover:bg-error-container/20 p-1 rounded transition-colors cursor-pointer" title="Xóa">
+                          <button onClick={() => handleDeleteMajor(row.id)} className="text-on-surface-variant hover:text-error hover:bg-error-container/20 p-1 rounded transition-colors cursor-pointer" title="Xóa">
                             <span className="material-symbols-outlined text-[20px]">delete</span>
                           </button>
                         </div>
@@ -322,14 +463,21 @@ export default function MasterDataPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-outline-variant">
-                {filteredClasses.length === 0 ? (
+                {loading ? (
+                  <tr>
+                    <td colSpan={5} className="py-xl text-center text-on-surface-variant font-body-md">
+                      <span className="material-symbols-outlined text-3xl text-primary animate-spin inline-block align-middle mr-2">sync</span>
+                      Đang tải dữ liệu...
+                    </td>
+                  </tr>
+                ) : paginatedClasses.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="py-xl text-center text-on-surface-variant font-body-md">
                       Không tìm thấy lớp nào khớp với từ khóa tìm kiếm.
                     </td>
                   </tr>
                 ) : (
-                  filteredClasses.map((row) => (
+                  paginatedClasses.map((row) => (
                     <tr key={row.code} className="hover:bg-surface-bright transition-colors group">
                       <td className="py-md px-md font-body-md text-body-md text-on-surface font-semibold">{row.code}</td>
                       <td className="py-md px-md font-body-md text-body-md font-medium text-primary">{row.name}</td>
@@ -337,10 +485,10 @@ export default function MasterDataPage() {
                       <td className="py-md px-md font-body-md text-body-md text-on-surface-variant">{row.advisor}</td>
                       <td className="py-md px-md text-right">
                         <div className="flex items-center justify-end gap-sm opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button className="text-on-surface-variant hover:text-primary hover:bg-surface-container p-1 rounded transition-colors cursor-pointer" title="Chỉnh sửa">
+                          <button onClick={() => handleEditClass(row)} className="text-on-surface-variant hover:text-primary hover:bg-surface-container p-1 rounded transition-colors cursor-pointer" title="Chỉnh sửa">
                             <span className="material-symbols-outlined text-[20px]">edit</span>
                           </button>
-                          <button className="text-on-surface-variant hover:text-error hover:bg-error-container/20 p-1 rounded transition-colors cursor-pointer" title="Xóa">
+                          <button onClick={() => handleDeleteClass(row.id)} className="text-on-surface-variant hover:text-error hover:bg-error-container/20 p-1 rounded transition-colors cursor-pointer" title="Xóa">
                             <span className="material-symbols-outlined text-[20px]">delete</span>
                           </button>
                         </div>
@@ -364,14 +512,21 @@ export default function MasterDataPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-outline-variant">
-                {filteredSubjects.length === 0 ? (
+                {loading ? (
+                  <tr>
+                    <td colSpan={5} className="py-xl text-center text-on-surface-variant font-body-md">
+                      <span className="material-symbols-outlined text-3xl text-primary animate-spin inline-block align-middle mr-2">sync</span>
+                      Đang tải dữ liệu...
+                    </td>
+                  </tr>
+                ) : paginatedSubjects.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="py-xl text-center text-on-surface-variant font-body-md">
                       Không tìm thấy môn học nào khớp với từ khóa tìm kiếm.
                     </td>
                   </tr>
                 ) : (
-                  filteredSubjects.map((row) => (
+                  paginatedSubjects.map((row) => (
                     <tr key={row.code} className="hover:bg-surface-bright transition-colors group">
                       <td className="py-md px-md font-body-md text-body-md text-on-surface font-semibold">{row.code}</td>
                       <td className="py-md px-md font-body-md text-body-md font-medium text-primary">{row.name}</td>
@@ -379,10 +534,10 @@ export default function MasterDataPage() {
                       <td className="py-md px-md font-body-md text-body-md text-on-surface-variant">{row.dept}</td>
                       <td className="py-md px-md text-right">
                         <div className="flex items-center justify-end gap-sm opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button className="text-on-surface-variant hover:text-primary hover:bg-surface-container p-1 rounded transition-colors cursor-pointer" title="Chỉnh sửa">
+                          <button onClick={() => handleEditSubject(row)} className="text-on-surface-variant hover:text-primary hover:bg-surface-container p-1 rounded transition-colors cursor-pointer" title="Chỉnh sửa">
                             <span className="material-symbols-outlined text-[20px]">edit</span>
                           </button>
-                          <button className="text-on-surface-variant hover:text-error hover:bg-error-container/20 p-1 rounded transition-colors cursor-pointer" title="Xóa">
+                          <button onClick={() => handleDeleteSubject(row.id)} className="text-on-surface-variant hover:text-error hover:bg-error-container/20 p-1 rounded transition-colors cursor-pointer" title="Xóa">
                             <span className="material-symbols-outlined text-[20px]">delete</span>
                           </button>
                         </div>
@@ -398,15 +553,22 @@ export default function MasterDataPage() {
         {/* Pagination Footer */}
         <div className="p-sm border-t border-outline-variant bg-surface-container-lowest flex flex-col sm:flex-row gap-sm items-center justify-between">
           <span className="font-label-sm text-label-sm text-on-surface-variant px-sm">
-            Hiển thị 1 đến {activeTab === "khoa" ? filteredDepts.length : activeTab === "nganh" ? filteredMajors.length : activeTab === "lop" ? filteredClasses.length : filteredSubjects.length} trong tổng số các bản ghi
+            Hiển thị {(currentPage - 1) * ITEMS_PER_PAGE + 1} - {Math.min(currentPage * ITEMS_PER_PAGE, activeDataList.length)} trong tổng số {activeDataList.length} bản ghi
           </span>
           <div className="flex items-center gap-xs">
-            <button className="p-1 text-outline hover:text-on-surface disabled:opacity-50 transition-colors cursor-pointer" disabled>
+            <button 
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              disabled={currentPage === 1}
+              className="p-1 text-on-surface-variant hover:text-on-surface disabled:opacity-50 transition-colors cursor-pointer"
+            >
               <span className="material-symbols-outlined">chevron_left</span>
             </button>
-            <button className="w-8 h-8 rounded bg-primary text-on-primary font-label-sm flex items-center justify-center cursor-pointer">1</button>
-            <button className="w-8 h-8 rounded text-on-surface-variant hover:bg-surface-container font-label-sm flex items-center justify-center transition-colors cursor-pointer">2</button>
-            <button className="p-1 text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer">
+            <span className="px-2 font-label-sm text-on-surface">Trang {currentPage} / {totalPages}</span>
+            <button 
+              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+              disabled={currentPage === totalPages}
+              className="p-1 text-on-surface-variant hover:text-on-surface disabled:opacity-50 transition-colors cursor-pointer"
+            >
               <span className="material-symbols-outlined">chevron_right</span>
             </button>
           </div>

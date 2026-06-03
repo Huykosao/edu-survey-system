@@ -30,15 +30,11 @@ def verify_password(plain_password: str, hashed_password: bytes) -> bool:
 
 
 def create_user_services(user: CreateUserRequest):
-    try:
-        save_user = NewUser(
-            full_name=user.full_name,
-            email=user.email,
-            password_hash=hash_password(user.password),
-            username=(user.email.split("@"))[0]
-        )
+    save_user = NewUser(
+        full_name=user.full_name,
+        email=user.email,
+        password_hash=hash_password(user.password).decode('utf-8'),
+        username=(user.email.split("@"))[0]
+    )
 
-        return create_user(save_user)
-
-    except Exception:
-        raise Exception
+    return create_user(save_user)

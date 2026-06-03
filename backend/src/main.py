@@ -34,4 +34,4 @@ def read_item(item_id: int, q: str | None = None):
 @app.get("/roles")
 def get_roles():
     role_data = supabase_client.table("roles").select("*").execute()
-    return {"data" : role_data.data}
+    return {"data" : role_data.data} 
