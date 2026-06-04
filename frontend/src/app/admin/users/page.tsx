@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { usersApi } from "@/lib/api";
 
 interface User {
   id: string;
@@ -18,85 +19,120 @@ export default function UserManagementPage() {
   const [selectedRole, setSelectedRole] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
+  const [loading, setLoading] = useState(false);
+  
+  // Pagination & Dropdown states
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 8;
+  const [openDropdown, setOpenDropdown] = useState<string | null>(null);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, selectedRole, selectedStatus]);
 
   // Form states for new user
   const [newName, setNewName] = useState("");
   const [newEmail, setNewEmail] = useState("");
-  const [newRole, setNewRole] = useState<"Sinh viên" | "Giảng viên" | "Quản lý" | "Quản trị viên">("Sinh viên");
+  const [newPassword, setNewPassword] = useState("");
+  const [newRole, setNewRole] = useState<"Sinh viên" | "Giảng viên" | "Quản lý" | "Quản trị viên" | "Cựu sinh viên" | "Nhà tuyển dụng">("Sinh viên");
 
   // Users Data
-  const [users, setUsers] = useState<User[]>([
-    {
-      id: "1",
-      name: "Nguyễn Văn Hải",
-      email: "hai.nguyen@university.edu",
-      role: "Sinh viên",
-      status: "Hoạt động",
-      avatarInitials: "NH",
-    },
-    {
-      id: "2",
-      name: "Trần Thị Mai",
-      email: "mai.tran@faculty.edu",
-      role: "Giảng viên",
-      status: "Hoạt động",
-      avatarInitials: "TM",
-    },
-    {
-      id: "3",
-      name: "Lê Văn Đức",
-      email: "duc.le@admin.edu",
-      role: "Quản lý",
-      status: "Tạm khóa",
-      avatarInitials: "LD",
-    },
-    {
-      id: "4",
-      name: "Phạm Ngọc Anh",
-      email: "anh.pham@university.edu",
-      role: "Sinh viên",
-      status: "Hoạt động",
-      avatarInitials: "PA",
-    },
-  ]);
+  const [users, setUsers] = useState<User[]>([]);
 
-  const handleToggleLock = (id: string) => {
-    setUsers(
-      users.map((user) => {
-        if (user.id === id) {
-          const newStatus = user.status === "Hoạt động" ? "Tạm khóa" : "Hoạt động";
-          return { ...user, status: newStatus };
+  const loadUsers = async () => {
+    setLoading(true);
+    try {
+      const res: any = await usersApi.list();
+      const mapped = (res.data || []).map((u: any) => {
+        let role = "Sinh viên";
+        if (u.roles && u.roles.length > 0) {
+          if (u.roles[0] === "ADMIN") role = "Quản trị viên";
+          else if (u.roles[0] === "MANAGER") role = "Quản lý";
+          else if (u.roles[0] === "LECTURER") role = "Giảng viên";
+          else if (u.roles[0] === "STUDENT") role = "Sinh viên";
+          else if (u.roles[0] === "ALUMNI") role = "Cựu sinh viên";
+          else if (u.roles[0] === "EMPLOYER") role = "Nhà tuyển dụng";
         }
-        return user;
-      })
-    );
+        return {
+          id: u.id.toString(),
+          name: u.full_name,
+          email: u.email,
+          role,
+          status: u.status === "active" ? "Hoạt động" : "Tạm khóa",
+          avatarInitials: (u.full_name || "U").substring(0, 2).toUpperCase()
+        };
+      });
+      setUsers(mapped);
+    } catch (err: any) {
+      if (err?.message !== "Failed to fetch") {
+        console.error("Error loading users:", err);
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleAddUser = (e: React.FormEvent) => {
+  useEffect(() => {
+    loadUsers();
+  }, []);
+
+  const handleToggleLock = async (id: string) => {
+    const user = users.find(u => u.id === id);
+    if (!user) return;
+    const newStatus = user.status === "Hoạt động" ? "inactive" : "active";
+    try {
+      await usersApi.update(parseInt(id), { status: newStatus });
+      setUsers(
+        users.map((u) => {
+          if (u.id === id) {
+            return { ...u, status: newStatus === "active" ? "Hoạt động" : "Tạm khóa" as any };
+          }
+          return u;
+        })
+      );
+    } catch (err) {
+      console.error("Error toggling user status:", err);
+    }
+  };
+
+  const handleDeleteUser = async (id: string) => {
+    if (!confirm("Bạn có chắc chắn muốn xóa người dùng này?")) return;
+    try {
+      await usersApi.delete(parseInt(id));
+      setUsers(users.filter(u => u.id !== id));
+    } catch (err) {
+      console.error("Error deleting user:", err);
+      alert("Có lỗi xảy ra khi xóa người dùng.");
+    }
+  };
+
+  const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newName || !newEmail) return;
+    if (!newName || !newEmail || !newPassword) return;
 
-    const initials = newName
-      .split(" ")
-      .map((n) => n[0])
-      .join("")
-      .toUpperCase()
-      .substring(0, 2);
+    let roleIds = [4]; // STUDENT
+    if (newRole === "Quản trị viên") roleIds = [1];
+    else if (newRole === "Quản lý") roleIds = [2];
+    else if (newRole === "Giảng viên") roleIds = [3];
+    else if (newRole === "Cựu sinh viên") roleIds = [5];
+    else if (newRole === "Nhà tuyển dụng") roleIds = [6];
 
-    const newUser: User = {
-      id: (users.length + 1).toString(),
-      name: newName,
-      email: newEmail,
-      role: newRole,
-      status: "Hoạt động",
-      avatarInitials: initials || "US",
-    };
-
-    setUsers([...users, newUser]);
-    setNewName("");
-    setNewEmail("");
-    setNewRole("Sinh viên");
-    setShowAddModal(false);
+    try {
+      await usersApi.create({
+        full_name: newName,
+        email: newEmail,
+        password: newPassword,
+        role_ids: roleIds
+      });
+      setNewName("");
+      setNewEmail("");
+      setNewPassword("");
+      setNewRole("Sinh viên");
+      setShowAddModal(false);
+      loadUsers();
+    } catch (err) {
+      console.error("Error creating user:", err);
+    }
   };
 
   // Filter logic
@@ -108,6 +144,9 @@ export default function UserManagementPage() {
     const matchesStatus = selectedStatus === "" || user.status === selectedStatus;
     return matchesSearch && matchesRole && matchesStatus;
   });
+
+  const totalPages = Math.max(1, Math.ceil(filteredUsers.length / ITEMS_PER_PAGE));
+  const paginatedUsers = filteredUsers.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
   return (
     <div className="flex flex-col gap-lg animate-in fade-in duration-300">
@@ -173,22 +212,27 @@ export default function UserManagementPage() {
 
       {/* Bento Grid / Role Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-lg">
-        {filteredUsers.length === 0 ? (
+          {loading ? (
+            <div className="col-span-full py-20 flex justify-center items-center text-primary">
+              <span className="material-symbols-outlined animate-spin text-4xl mr-3">sync</span>
+              Đang tải danh sách người dùng...
+            </div>
+          ) : paginatedUsers.length === 0 ? (
           <div className="col-span-full py-xl text-center text-on-surface-variant font-body-md">
             Không tìm thấy người dùng nào khớp với bộ lọc.
-          </div>
-        ) : (
-          filteredUsers.map((user) => {
-            const isLocked = user.status === "Tạm khóa";
+            </div>
+          ) : (
+            paginatedUsers.map((user) => {
+              const isLocked = user.status === "Tạm khóa";
             return (
               <div
                 key={user.id}
-                className={`rounded-xl p-lg hover:shadow-[0_4px_12px_rgba(0,0,0,0.05)] transition-all duration-200 flex flex-col h-full relative overflow-hidden bg-surface-container-lowest border ${
+                className={`rounded-xl p-lg hover:shadow-[0_4px_12px_rgba(0,0,0,0.05)] transition-all duration-200 flex flex-col h-full relative bg-surface-container-lowest border ${
                   isLocked ? "border-error-container" : "border-outline-variant"
                 }`}
               >
                 {/* Locked overlay effect */}
-                {isLocked && <div className="absolute inset-0 bg-surface-container-highest opacity-25 pointer-events-none z-0"></div>}
+                {isLocked && <div className="absolute inset-0 bg-surface-container-highest opacity-25 pointer-events-none z-0 rounded-xl"></div>}
 
                 <div className="flex justify-between items-start mb-md relative z-10">
                   <div className="flex items-center gap-md">
@@ -210,9 +254,48 @@ export default function UserManagementPage() {
                       <p className="font-body-md text-label-sm text-on-surface-variant">{user.email}</p>
                     </div>
                   </div>
-                  <button className="text-on-surface-variant hover:text-primary transition-colors cursor-pointer">
-                    <span className="material-symbols-outlined">more_vert</span>
-                  </button>
+                  <div className="relative">
+                    <button 
+                      onClick={() => setOpenDropdown(openDropdown === user.id ? null : user.id)}
+                      className="text-on-surface-variant hover:text-primary transition-colors cursor-pointer p-1 rounded-full hover:bg-surface-container"
+                    >
+                      <span className="material-symbols-outlined">more_vert</span>
+                    </button>
+                    {openDropdown === user.id && (
+                      <div className="absolute right-0 mt-1 w-48 bg-surface rounded-lg shadow-lg border border-outline-variant py-1 z-20">
+                        <button
+                          onClick={() => {
+                            setOpenDropdown(null);
+                            router.push(`/admin/users/edit?id=${user.id}`);
+                          }}
+                          className="w-full text-left px-4 py-2.5 text-label-md hover:bg-surface-container flex items-center gap-3 transition-colors cursor-pointer"
+                        >
+                          <span className="material-symbols-outlined text-[18px]">edit</span>
+                          Chỉnh sửa
+                        </button>
+                        <button 
+                          onClick={() => {
+                            setOpenDropdown(null);
+                            handleToggleLock(user.id);
+                          }}
+                          className="w-full text-left px-4 py-2.5 text-label-md hover:bg-surface-container flex items-center gap-3 transition-colors cursor-pointer"
+                        >
+                          <span className="material-symbols-outlined text-[18px]">{isLocked ? "lock_open" : "lock"}</span>
+                          {isLocked ? "Mở khóa" : "Khóa tài khoản"}
+                        </button>
+                        <button 
+                          onClick={() => {
+                            setOpenDropdown(null);
+                            handleDeleteUser(user.id);
+                          }}
+                          className="w-full text-left px-4 py-2.5 text-label-md text-error hover:bg-error-container/20 flex items-center gap-3 transition-colors cursor-pointer"
+                        >
+                          <span className="material-symbols-outlined text-[18px]">delete</span>
+                          Xóa người dùng
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <div className="flex gap-sm mb-lg mt-auto relative z-10">
@@ -231,25 +314,6 @@ export default function UserManagementPage() {
                     </span>
                   )}
                 </div>
-
-                <div className="border-t border-outline-variant pt-md mt-auto flex justify-between items-center relative z-10">
-                  <button
-                    onClick={() => router.push(`/admin/users/edit?id=${user.id}`)}
-                    className="flex items-center gap-2 text-primary font-label-md text-label-sm hover:underline cursor-pointer"
-                  >
-                    <span className="material-symbols-outlined text-[16px]">edit</span>
-                    Chỉnh sửa
-                  </button>
-                  <button
-                    onClick={() => handleToggleLock(user.id)}
-                    className={`flex items-center gap-2 font-label-md text-label-sm transition-colors cursor-pointer ${
-                      isLocked ? "text-secondary hover:text-primary" : "text-on-surface-variant hover:text-error"
-                    }`}
-                  >
-                    <span className="material-symbols-outlined text-[16px]">{isLocked ? "lock_open" : "lock"}</span>
-                    {isLocked ? "Mở khóa" : "Tạm khóa"}
-                  </button>
-                </div>
               </div>
             );
           })
@@ -259,15 +323,28 @@ export default function UserManagementPage() {
       {/* Pagination */}
       <div className="flex justify-between items-center pt-md border-t border-outline-variant mt-md">
         <p className="font-body-md text-label-sm text-on-surface-variant">
-          Hiển thị {filteredUsers.length} trên {users.length} người dùng
+          Hiển thị {(currentPage - 1) * ITEMS_PER_PAGE + 1} - {Math.min(currentPage * ITEMS_PER_PAGE, filteredUsers.length)} trên {filteredUsers.length} người dùng
         </p>
-        <div className="flex gap-2">
-          <button className="px-3 py-1 rounded border border-outline-variant text-on-surface-variant disabled:opacity-50 cursor-pointer" disabled>
+        <div className="flex gap-2 items-center">
+          <button 
+            onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+            disabled={currentPage === 1}
+            className="px-3 py-1 rounded border border-outline-variant text-on-surface-variant disabled:opacity-50 cursor-pointer hover:bg-surface-container transition-colors"
+          >
             Trước
           </button>
-          <button className="px-3 py-1 rounded bg-primary text-on-primary cursor-pointer">1</button>
-          <button className="px-3 py-1 rounded border border-outline-variant text-on-surface hover:bg-surface-container-high cursor-pointer">2</button>
-          <button className="px-3 py-1 rounded border border-outline-variant text-on-surface hover:bg-surface-container-high cursor-pointer">Sau</button>
+          
+          <span className="font-label-md px-2 text-on-surface">
+            Trang {currentPage} / {totalPages}
+          </span>
+          
+          <button 
+            onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+            disabled={currentPage === totalPages}
+            className="px-3 py-1 rounded border border-outline-variant text-on-surface-variant hover:bg-surface-container disabled:opacity-50 cursor-pointer transition-colors"
+          >
+            Sau
+          </button>
         </div>
       </div>
 
@@ -305,6 +382,18 @@ export default function UserManagementPage() {
                 />
               </div>
               <div className="flex flex-col gap-xs">
+                <label className="text-label-md font-semibold text-on-surface-variant" htmlFor="user-password">Mật khẩu</label>
+                <input
+                  id="user-password"
+                  type="password"
+                  required
+                  placeholder="Nhập mật khẩu..."
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="w-full p-2.5 bg-surface-container-lowest border border-outline-variant rounded-lg font-body-md focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                />
+              </div>
+              <div className="flex flex-col gap-xs">
                 <label className="text-label-md font-semibold text-on-surface-variant" htmlFor="user-role">Vai trò</label>
                 <select
                   id="user-role"
@@ -316,6 +405,8 @@ export default function UserManagementPage() {
                   <option>Giảng viên</option>
                   <option>Quản lý</option>
                   <option>Quản trị viên</option>
+                  <option>Cựu sinh viên</option>
+                  <option>Nhà tuyển dụng</option>
                 </select>
               </div>
               <div className="flex gap-sm justify-end mt-lg">
