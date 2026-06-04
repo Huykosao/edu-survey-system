@@ -232,6 +232,25 @@ export const usersApi = {
 };
 
 // =============================================================
+// Allowed Domains API (Admin)
+// =============================================================
+export const allowedDomainsApi = {
+  list: () => apiFetch<Record<string, unknown>[]>("/api/allowed-domains"),
+  create: (data: { domain: string; description?: string }) =>
+    apiFetch<Record<string, unknown>>("/api/allowed-domains", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  update: (id: number, data: { domain: string; description?: string }) =>
+    apiFetch<Record<string, unknown>>(`/api/allowed-domains/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+  delete: (id: number) =>
+    apiFetch(`/api/allowed-domains/${id}`, { method: "DELETE" }),
+};
+
+// =============================================================
 // Roles API
 // =============================================================
 export const rolesApi = {

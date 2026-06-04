@@ -24,7 +24,7 @@ export default function AdminLayout({
   const hasManager = roles.includes("MANAGER");
   const hasLecturer = roles.includes("LECTURER");
 
-  const adminOnlyPaths = ["/admin/users", "/admin/master-data", "/admin/permissions", "/admin/logs"];
+  const adminOnlyPaths = ["/admin/users", "/admin/master-data", "/admin/permissions", "/admin/logs", "/admin/allowed-domains"];
   const managerOnlyPaths = ["/admin/surveys", "/admin/clarifications", "/admin/approvals", "/admin/reports"];
   const lecturerOnlyPaths = ["/admin/my-clarifications"];
 
@@ -96,6 +96,11 @@ export default function AdminLayout({
           icon: "group",
         },
         {
+          name: "Quản lý Tên miền",
+          path: "/admin/allowed-domains",
+          icon: "domain",
+        },
+        {
           name: "Quản lý Danh mục",
           path: "/admin/master-data",
           icon: "settings",
@@ -109,7 +114,7 @@ export default function AdminLayout({
           name: "Nhật ký Hệ thống",
           path: "/admin/logs",
           icon: "history_toggle_off",
-        }
+        },
       );
     }
 
@@ -134,7 +139,7 @@ export default function AdminLayout({
           name: "Báo cáo & Thống kê",
           path: "/admin/reports",
           icon: "analytics",
-        }
+        },
       );
     }
 
@@ -168,13 +173,15 @@ export default function AdminLayout({
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
           <div className="w-12 h-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
-          <span className="text-[14px] text-on-surface-variant font-medium">Đang tải...</span>
+          <span className="text-[14px] text-on-surface-variant font-medium">
+            Đang tải...
+          </span>
         </div>
       </div>
     );
   }
 
-  if (!isAuthenticated || !isAuthorized) {
+  if (!isAuthenticated) {
     return null;
   }
 
@@ -203,16 +210,25 @@ export default function AdminLayout({
             className="md:hidden text-on-surface-variant hover:bg-surface-container-low p-2 rounded-full flex items-center justify-center cursor-pointer transition-colors"
             aria-label="Toggle menu"
           >
-            <span className="material-symbols-outlined">{mobileMenuOpen ? "close" : "menu"}</span>
+            <span className="material-symbols-outlined">
+              {mobileMenuOpen ? "close" : "menu"}
+            </span>
           </button>
-          
+
           {/* Logo Title */}
-          <Link href={roles.includes("ADMIN") ? "/admin/users" : "/admin"} className="flex items-center gap-2.5 group">
+          <Link
+            href={roles.includes("ADMIN") ? "/admin/users" : "/admin"}
+            className="flex items-center gap-2.5 group"
+          >
             <div className="w-9 h-9 bg-primary rounded-xl flex items-center justify-center shadow-sm group-hover:shadow-md transition-shadow">
-              <span className="material-symbols-outlined text-on-primary text-[20px] icon-fill">school</span>
+              <span className="material-symbols-outlined text-on-primary text-[20px] icon-fill">
+                school
+              </span>
             </div>
             <div className="flex flex-col">
-              <span className="text-[16px] font-bold text-primary leading-tight">EduSurvey</span>
+              <span className="text-[16px] font-bold text-primary leading-tight">
+                EduSurvey
+              </span>
               <span className="text-[10px] text-on-surface-variant leading-none hidden sm:block">
                 {getRoleLabel(primaryRole)}
               </span>
@@ -227,7 +243,9 @@ export default function AdminLayout({
             href="/admin/notifications"
             className="text-on-surface-variant hover:bg-surface-container-low transition-colors p-2 rounded-full flex items-center justify-center cursor-pointer relative"
           >
-            <span className="material-symbols-outlined text-[22px]">notifications</span>
+            <span className="material-symbols-outlined text-[22px]">
+              notifications
+            </span>
             <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-error rounded-full border-2 border-surface-container-lowest"></span>
           </Link>
 
@@ -251,24 +269,35 @@ export default function AdminLayout({
                   {getRoleLabel(primaryRole)}
                 </span>
               </div>
-              <span className="material-symbols-outlined text-on-surface-variant text-[18px] hidden lg:block">expand_more</span>
+              <span className="material-symbols-outlined text-on-surface-variant text-[18px] hidden lg:block">
+                expand_more
+              </span>
             </button>
 
             {/* Profile Dropdown */}
             {showProfileMenu && (
               <>
-                <div className="fixed inset-0 z-40" onClick={() => setShowProfileMenu(false)}></div>
+                <div
+                  className="fixed inset-0 z-40"
+                  onClick={() => setShowProfileMenu(false)}
+                ></div>
                 <div className="absolute right-0 top-full mt-2 w-56 bg-surface-container-lowest rounded-xl shadow-xl border border-outline-variant/30 py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
                   <div className="px-4 py-2.5 border-b border-outline-variant/20 mb-1">
-                    <p className="text-[13px] font-semibold text-on-surface">{user?.full_name}</p>
-                    <p className="text-[12px] text-on-surface-variant">{user?.email}</p>
+                    <p className="text-[13px] font-semibold text-on-surface">
+                      {user?.full_name}
+                    </p>
+                    <p className="text-[12px] text-on-surface-variant">
+                      {user?.email}
+                    </p>
                   </div>
                   <Link
                     href="/admin/profile"
                     onClick={() => setShowProfileMenu(false)}
                     className="flex items-center gap-3 px-4 py-2.5 text-[13px] text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors"
                   >
-                    <span className="material-symbols-outlined text-[18px]">person</span>
+                    <span className="material-symbols-outlined text-[18px]">
+                      person
+                    </span>
                     Hồ sơ cá nhân
                   </Link>
                   <Link
@@ -276,7 +305,9 @@ export default function AdminLayout({
                     onClick={() => setShowProfileMenu(false)}
                     className="flex items-center gap-3 px-4 py-2.5 text-[13px] text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors"
                   >
-                    <span className="material-symbols-outlined text-[18px]">key</span>
+                    <span className="material-symbols-outlined text-[18px]">
+                      key
+                    </span>
                     Đổi mật khẩu
                   </Link>
                   <div className="h-px bg-outline-variant/20 my-1"></div>
@@ -284,7 +315,9 @@ export default function AdminLayout({
                     onClick={handleLogout}
                     className="flex items-center gap-3 px-4 py-2.5 text-[13px] text-error hover:bg-error-container/15 transition-colors w-full text-left cursor-pointer"
                   >
-                    <span className="material-symbols-outlined text-[18px]">logout</span>
+                    <span className="material-symbols-outlined text-[18px]">
+                      logout
+                    </span>
                     Đăng xuất
                   </button>
                 </div>
@@ -300,7 +333,9 @@ export default function AdminLayout({
         <aside className="fixed left-0 top-16 bottom-0 w-[260px] bg-surface-container-lowest border-r border-outline-variant/30 hidden md:flex flex-col py-4 px-3 z-40">
           <nav className="flex-1 flex flex-col gap-1">
             {menuItems.map((item) => {
-              const isActive = pathname === item.path || (item.path !== "/admin" && pathname?.startsWith(item.path));
+              const isActive =
+                pathname === item.path ||
+                (item.path !== "/admin" && pathname?.startsWith(item.path));
               return (
                 <Link
                   key={item.path}
@@ -311,10 +346,14 @@ export default function AdminLayout({
                       : "text-on-surface-variant hover:bg-surface-container-low"
                   }`}
                 >
-                  <span className={`material-symbols-outlined text-[22px] ${isActive ? "icon-fill text-primary" : "group-hover:text-on-surface"}`}>
+                  <span
+                    className={`material-symbols-outlined text-[22px] ${isActive ? "icon-fill text-primary" : "group-hover:text-on-surface"}`}
+                  >
                     {item.icon}
                   </span>
-                  <span className="text-[14px] whitespace-nowrap">{item.name}</span>
+                  <span className="text-[14px] whitespace-nowrap">
+                    {item.name}
+                  </span>
                   {isActive && (
                     <div className="ml-auto w-1.5 h-5 bg-primary rounded-full"></div>
                   )}
@@ -326,20 +365,30 @@ export default function AdminLayout({
           {/* Sidebar Footer */}
           <div className="border-t border-outline-variant/20 pt-3 flex flex-col gap-1">
             {/* Show survey board link for student roles or anyone who has it */}
-            {(roles.includes("STUDENT") || roles.includes("ALUMNI") || roles.includes("EMPLOYER")) && (
+            {(roles.includes("STUDENT") ||
+              roles.includes("ALUMNI") ||
+              roles.includes("EMPLOYER") ||
+              roles.includes("LECTURER") ||
+              roles.includes("MANAGER")) && (
               <Link
                 href="/survey"
                 className="flex items-center gap-3 px-3 h-11 rounded-xl text-on-surface-variant hover:bg-surface-container-low transition-all duration-150"
               >
-                <span className="material-symbols-outlined text-[22px]">assignment</span>
-                <span className="text-[14px] whitespace-nowrap">Giao diện Khảo sát</span>
+                <span className="material-symbols-outlined text-[22px]">
+                  assignment
+                </span>
+                <span className="text-[14px] whitespace-nowrap">
+                  Giao diện Khảo sát
+                </span>
               </Link>
             )}
             <button
               onClick={handleLogout}
               className="flex items-center gap-3 px-3 h-11 rounded-xl text-error hover:bg-error-container/15 transition-all duration-150 w-full text-left cursor-pointer"
             >
-              <span className="material-symbols-outlined text-[22px]">logout</span>
+              <span className="material-symbols-outlined text-[22px]">
+                logout
+              </span>
               <span className="text-[14px] whitespace-nowrap">Đăng xuất</span>
             </button>
           </div>
@@ -355,7 +404,9 @@ export default function AdminLayout({
             <aside className="fixed left-0 top-16 bottom-0 w-[280px] bg-surface-container-lowest border-r border-outline-variant/30 flex flex-col py-4 px-3 z-40 md:hidden shadow-2xl">
               <nav className="flex-grow flex flex-col gap-1">
                 {menuItems.map((item) => {
-                  const isActive = pathname === item.path || (item.path !== "/admin" && pathname?.startsWith(item.path));
+                  const isActive =
+                    pathname === item.path ||
+                    (item.path !== "/admin" && pathname?.startsWith(item.path));
                   return (
                     <Link
                       key={item.path}
@@ -367,10 +418,14 @@ export default function AdminLayout({
                           : "text-on-surface-variant hover:bg-surface-container-low"
                       }`}
                     >
-                      <span className={`material-symbols-outlined text-[22px] ${isActive ? "icon-fill text-primary" : ""}`}>
+                      <span
+                        className={`material-symbols-outlined text-[22px] ${isActive ? "icon-fill text-primary" : ""}`}
+                      >
                         {item.icon}
                       </span>
-                      <span className="text-[14px] whitespace-nowrap">{item.name}</span>
+                      <span className="text-[14px] whitespace-nowrap">
+                        {item.name}
+                      </span>
                     </Link>
                   );
                 })}
@@ -378,22 +433,34 @@ export default function AdminLayout({
 
               {/* Mobile Sidebar Footer */}
               <div className="border-t border-outline-variant/20 pt-3 flex flex-col gap-1">
-                {(roles.includes("STUDENT") || roles.includes("ALUMNI") || roles.includes("EMPLOYER")) && (
+                {(roles.includes("STUDENT") ||
+                  roles.includes("ALUMNI") ||
+                  roles.includes("EMPLOYER") ||
+                  roles.includes("LECTURER") ||
+                  roles.includes("MANAGER")) && (
                   <Link
                     href="/survey"
                     onClick={() => setMobileMenuOpen(false)}
                     className="flex items-center gap-3 px-3 h-11 rounded-xl text-on-surface-variant hover:bg-surface-container-low transition-all duration-150"
                   >
-                    <span className="material-symbols-outlined text-[22px]">assignment</span>
-                    <span className="text-[14px] whitespace-nowrap">Giao diện Khảo sát</span>
+                    <span className="material-symbols-outlined text-[22px]">
+                      assignment
+                    </span>
+                    <span className="text-[14px] whitespace-nowrap">
+                      Giao diện Khảo sát
+                    </span>
                   </Link>
                 )}
                 <button
                   onClick={handleLogout}
                   className="flex items-center gap-3 px-3 h-11 rounded-xl text-error hover:bg-error-container/15 transition-all duration-150 w-full text-left cursor-pointer"
                 >
-                  <span className="material-symbols-outlined text-[22px]">logout</span>
-                  <span className="text-[14px] whitespace-nowrap">Đăng xuất</span>
+                  <span className="material-symbols-outlined text-[22px]">
+                    logout
+                  </span>
+                  <span className="text-[14px] whitespace-nowrap">
+                    Đăng xuất
+                  </span>
                 </button>
               </div>
             </aside>
@@ -402,9 +469,7 @@ export default function AdminLayout({
 
         {/* Main Content Area */}
         <main className="flex-1 md:ml-[260px] p-4 md:p-6 overflow-y-auto bg-background transition-all duration-200">
-          <div className="max-w-[1400px] mx-auto w-full">
-            {children}
-          </div>
+          <div className="max-w-[1400px] mx-auto w-full">{children}</div>
         </main>
       </div>
     </div>

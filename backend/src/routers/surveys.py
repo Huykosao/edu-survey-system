@@ -52,13 +52,19 @@ def get_survey(sid: int, _: dict = Depends(get_current_user)):
 @router.post("/surveys", response_model=SurveyResponse)
 def create_survey(req: CreateSurveyRequest, current_user: dict = Depends(require_manager)):
     """Tạo khảo sát mới. [MANAGER, ADMIN]"""
-    return survey_svc.create_new_survey(req.model_dump(), current_user["id"])
+    data = req.model_dump(exclude={"content"})
+    data["content"] = req.content_as_dict()
+    return survey_svc.create_new_survey(data, current_user["id"])
 
 
 @router.put("/surveys/{sid}", response_model=SurveyResponse)
 def update_survey(sid: int, req: UpdateSurveyRequest, _: dict = Depends(require_manager)):
     """Cập nhật khảo sát. [MANAGER, ADMIN]"""
-    return survey_svc.modify_survey(sid, req.model_dump(exclude_none=True))
+    data = req.model_dump(exclude_none=True, exclude={"content"})
+    content_dict = req.content_as_dict()
+    if content_dict is not None:
+        data["content"] = content_dict
+    return survey_svc.modify_survey(sid, data)
 
 
 @router.delete("/surveys/{sid}", response_model=MessageResponse)
@@ -89,9 +95,9 @@ def duplicate_survey(sid: int, current_user: dict = Depends(require_manager)):
 # ── Survey Responses (All users) ──────────────────────────────────────────────
 
 @router.get("/my-surveys", response_model=list[SurveyResponse])
-def get_my_surveys(_: dict = Depends(get_current_user)):
+def get_my_surveys(current_user: dict = Depends(get_current_user)):
     """Danh sách khảo sát đang phát hành."""
-    return list_published_surveys()
+    return survey_svc.get_surveys_for_user(current_user)
 
 
 @router.post("/surveys/{sid}/responses", response_model=SurveyResponseItem)

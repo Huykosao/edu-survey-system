@@ -195,7 +195,7 @@ CREATE TABLE public.lecturer_responses_to_students (
 -- Manager đăng thông báo về những gì trường đã cải thiện sau khảo sát
 CREATE TABLE public.improvement_announcements (
     id SERIAL PRIMARY KEY,
-    survey_id INT REFERENCES public.surveys(id),
+    survey_id INT REFERENCES public.surveys(id) ON DELETE CASCADE,
     title VARCHAR(255),
     content TEXT,
     target_roles JSONB, -- [STUDENT, ALUMNI, EMPLOYER]
@@ -215,6 +215,22 @@ CREATE TABLE public.notifications (
     is_read BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMPTZ DEFAULT now()
 );
+
+-- 1. Tạo bảng lưu trữ danh sách tên miền email được phép
+CREATE TABLE public.allowed_domains (
+    id SERIAL PRIMARY KEY,
+    domain VARCHAR(255) UNIQUE NOT NULL,
+    description TEXT,
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- 2. Chèn dữ liệu mẫu
+INSERT INTO public.allowed_domains (domain, description) VALUES
+('example.com', 'Tên miền thử nghiệm'),
+('mycompany.com', 'Tên miền công ty'),
+('edu.vn', 'Tên miền giáo dục chung'),
+('student.edu.vn', 'Tên miền sinh viên');
+
 
 -- ==========================================
 -- 10. CHỈ MỤC TỐI ƯU (INDEXES)

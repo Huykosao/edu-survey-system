@@ -11,7 +11,7 @@ interface UserProfile {
   email: string;
   phone: string;
   dept: string;
-  role: "student" | "faculty" | "manager" | "admin";
+  role: "student" | "faculty" | "manager" | "admin" | "alumni" | "employer";
   status: "active" | "locked";
 }
 
@@ -46,6 +46,9 @@ function EditUserForm() {
           if (res.roles[0] === "ADMIN") r = "admin";
           else if (res.roles[0] === "MANAGER") r = "manager";
           else if (res.roles[0] === "LECTURER") r = "faculty";
+          else if (res.roles[0] === "STUDENT") r = "student";
+          else if (res.roles[0] === "ALUMNI") r = "alumni";
+          else if (res.roles[0] === "EMPLOYER") r = "employer";
         }
         setProfile({
           id: res.id.toString(),
@@ -64,10 +67,12 @@ function EditUserForm() {
   const handleSave = async () => {
     if (!userId) return;
     try {
-      let role_id = 1;
-      if (profile.role === "admin") role_id = 4;
-      else if (profile.role === "manager") role_id = 3;
-      else if (profile.role === "faculty") role_id = 2;
+      let role_id = 4; // student
+      if (profile.role === "admin") role_id = 1;
+      else if (profile.role === "manager") role_id = 2;
+      else if (profile.role === "faculty") role_id = 3;
+      else if (profile.role === "alumni") role_id = 5;
+      else if (profile.role === "employer") role_id = 6;
 
       await usersApi.update(parseInt(userId), {
         full_name: profile.name,
@@ -234,7 +239,7 @@ function EditUserForm() {
                 {
                   id: "faculty",
                   title: "Giảng viên",
-                  desc: "Có thể tạo khảo sát cấp độ lớp học.",
+                  desc: "Có thể đăng ký giải trình và gửi thông tin lớp học.",
                 },
                 {
                   id: "manager",
@@ -245,6 +250,16 @@ function EditUserForm() {
                   id: "admin",
                   title: "Quản trị viên",
                   desc: "Toàn quyền kiểm soát hệ thống.",
+                },
+                {
+                  id: "alumni",
+                  title: "Cựu sinh viên",
+                  desc: "Khảo sát việc làm và chất lượng đào tạo.",
+                },
+                {
+                  id: "employer",
+                  title: "Nhà tuyển dụng",
+                  desc: "Khảo sát nhu cầu và phản hồi doanh nghiệp.",
                 },
               ].map((role) => (
                 <label

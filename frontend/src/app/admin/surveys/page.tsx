@@ -10,6 +10,7 @@ interface Survey {
   status: "draft" | "published" | "closed";
   is_anonymous: boolean;
   target_config: any;
+  content?: any;
   created_at: string;
 }
 
@@ -19,7 +20,15 @@ export default function SurveysManagerPage() {
   const [activeTab, setActiveTab] = useState<"all" | "draft" | "published" | "closed">("all");
   const [showCreateModal, setShowCreateModal] = useState(false);
 
-  // Form state
+  // Edit/Builder State
+  const [editingSurvey, setEditingSurvey] = useState<Survey | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [editIsAnonymous, setEditIsAnonymous] = useState(true);
+  const [editTargetRole, setEditTargetRole] = useState("STUDENT");
+  const [editSections, setEditSections] = useState<any[]>([]);
+
+  // Create Form state
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [isAnonymous, setIsAnonymous] = useState(true);
@@ -52,21 +61,32 @@ export default function SurveysManagerPage() {
         status: "draft",
         target_config: { role: targetRole },
         content: {
-          questions: [
+          sections: [
             {
-              id: "q1",
-              type: "scale",
-              label: "Đánh giá chất lượng chung của học phần?",
-              min: 1,
-              max: 5,
-            },
-            {
-              id: "q2",
-              type: "text",
-              label: "Ý kiến đóng góp cải tiến học phần?",
-            },
-          ],
-        },
+              id: "s1",
+              title: "Phần 1: Khảo sát ý kiến học viên",
+              description: "Vui lòng trả lời các câu hỏi đánh giá dưới đây.",
+              questions: [
+                {
+                  id: "q1",
+                  type: "likert",
+                  label: "Giảng viên giảng dạy rõ ràng và dễ hiểu.",
+                  required: true,
+                  min_label: "Hoàn toàn không đồng ý",
+                  max_label: "Hoàn toàn đồng ý"
+                },
+                {
+                  id: "q2",
+                  type: "open_ended",
+                  label: "Góp ý thêm cho giảng viên hoặc học phần (nếu có):",
+                  required: false,
+                  placeholder: "Nhập ý kiến của bạn...",
+                  max_length: 1000
+                }
+              ]
+            }
+          ]
+        }
       });
       setTitle("");
       setDescription("");
@@ -75,7 +95,225 @@ export default function SurveysManagerPage() {
       loadSurveys();
     } catch (err) {
       console.error("Error creating survey:", err);
+      alert("Lỗi khi tạo khảo sát. Vui lòng thử lại.");
     }
+  };
+
+  // Edit / Builder Actions
+  const handleStartEdit = (survey: Survey) => {
+    setEditingSurvey(survey);
+    setEditTitle(survey.title);
+    setEditDescription(survey.description || "");
+    setEditIsAnonymous(survey.is_anonymous);
+    setEditTargetRole(survey.target_config?.role || "STUDENT");
+    
+    const content = survey.content || {};
+    const sectionsList = content.sections || [
+      {
+        id: "s1",
+        title: "Phần 1: Nội dung khảo sát",
+        description: "",
+        questions: []
+      }
+    ];
+    setEditSections(JSON.parse(JSON.stringify(sectionsList)));
+  };
+
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingSurvey) return;
+    if (!editTitle.trim()) return;
+
+    try {
+      await surveysApi.update(editingSurvey.id, {
+        title: editTitle,
+        description: editDescription,
+        is_anonymous: editIsAnonymous,
+        target_config: { role: editTargetRole },
+        content: {
+          sections: editSections
+        }
+      });
+      setEditingSurvey(null);
+      loadSurveys();
+    } catch (err) {
+      console.error("Error updating survey:", err);
+      alert("Lỗi cập nhật khảo sát. Vui lòng kiểm tra lại cấu trúc câu hỏi.");
+    }
+  };
+
+  // Section Management
+  const addSection = () => {
+    const newSectionId = `s_${Date.now()}`;
+    setEditSections(prev => [
+      ...prev,
+      {
+        id: newSectionId,
+        title: `Phần ${prev.length + 1}`,
+        description: "",
+        questions: []
+      }
+    ]);
+  };
+
+  const removeSection = (sectionId: string) => {
+    if (editSections.length <= 1) {
+      alert("Khảo sát phải có ít nhất một phần.");
+      return;
+    }
+    setEditSections(prev => prev.filter(s => s.id !== sectionId));
+  };
+
+  const updateSectionField = (sectionId: string, field: string, value: string) => {
+    setEditSections(prev => prev.map(s => s.id === sectionId ? { ...s, [field]: value } : s));
+  };
+
+  // Question Management
+  const addQuestion = (sectionId: string) => {
+    setEditSections(prev => prev.map(s => {
+      if (s.id !== sectionId) return s;
+      const newQId = `q_${Date.now()}`;
+      return {
+        ...s,
+        questions: [
+          ...s.questions,
+          {
+            id: newQId,
+            type: "likert",
+            label: "Nội dung câu hỏi mới",
+            required: true,
+            min_label: "Hoàn toàn không đồng ý",
+            max_label: "Hoàn toàn đồng ý"
+          }
+        ]
+      };
+    }));
+  };
+
+  const removeQuestion = (sectionId: string, questionId: string) => {
+    setEditSections(prev => prev.map(s => {
+      if (s.id !== sectionId) return s;
+      return {
+        ...s,
+        questions: s.questions.filter((q: any) => q.id !== questionId)
+      };
+    }));
+  };
+
+  const updateQuestionField = (sectionId: string, questionId: string, field: string, value: any) => {
+    setEditSections(prev => prev.map(s => {
+      if (s.id !== sectionId) return s;
+      return {
+        ...s,
+        questions: s.questions.map((q: any) => {
+          if (q.id !== questionId) return q;
+          const updated = { ...q, [field]: value };
+          
+          if (field === "type") {
+            if (value === "likert") {
+              updated.min_label = "Hoàn toàn không đồng ý";
+              updated.max_label = "Hoàn toàn đồng ý";
+              delete updated.options;
+              delete updated.max_selections;
+              delete updated.rows;
+              delete updated.columns;
+            } else if (value === "nps") {
+              updated.min_label = "Hoàn toàn không";
+              updated.max_label = "Chắc chắn có";
+              delete updated.options;
+              delete updated.max_selections;
+              delete updated.rows;
+              delete updated.columns;
+            } else if (value === "single_choice" || value === "multiple_choice") {
+              updated.options = ["Lựa chọn A", "Lựa chọn B"];
+              if (value === "multiple_choice") {
+                updated.max_selections = undefined;
+              } else {
+                delete updated.max_selections;
+              }
+              delete updated.min_label;
+              delete updated.max_label;
+              delete updated.rows;
+              delete updated.columns;
+            } else if (value === "matrix") {
+              updated.rows = ["Tiêu chí A"];
+              updated.columns = ["Kém", "Khá", "Tốt"];
+              delete updated.options;
+              delete updated.max_selections;
+              delete updated.min_label;
+              delete updated.max_label;
+            } else if (value === "open_ended") {
+              updated.placeholder = "Nhập ý kiến của bạn tại đây...";
+              updated.max_length = 1000;
+              delete updated.options;
+              delete updated.max_selections;
+              delete updated.min_label;
+              delete updated.max_label;
+              delete updated.rows;
+              delete updated.columns;
+            }
+          }
+          return updated;
+        })
+      };
+    }));
+  };
+
+  // Helper arrays update
+  const addArrayValue = (sectionId: string, questionId: string, field: "options" | "rows" | "columns") => {
+    setEditSections(prev => prev.map(s => {
+      if (s.id !== sectionId) return s;
+      return {
+        ...s,
+        questions: s.questions.map((q: any) => {
+          if (q.id !== questionId) return q;
+          const currentArr = q[field] || [];
+          return {
+            ...q,
+            [field]: [...currentArr, `Mục mới ${currentArr.length + 1}`]
+          };
+        })
+      };
+    }));
+  };
+
+  const removeArrayValue = (sectionId: string, questionId: string, field: "options" | "rows" | "columns", index: number) => {
+    setEditSections(prev => prev.map(s => {
+      if (s.id !== sectionId) return s;
+      return {
+        ...s,
+        questions: s.questions.map((q: any) => {
+          if (q.id !== questionId) return q;
+          const currentArr = q[field] || [];
+          if (currentArr.length <= 1) {
+            alert("Phải có ít nhất 1 mục.");
+            return q;
+          }
+          return {
+            ...q,
+            [field]: currentArr.filter((_: any, idx: number) => idx !== index)
+          };
+        })
+      };
+    }));
+  };
+
+  const updateArrayValue = (sectionId: string, questionId: string, field: "options" | "rows" | "columns", index: number, val: string) => {
+    setEditSections(prev => prev.map(s => {
+      if (s.id !== sectionId) return s;
+      return {
+        ...s,
+        questions: s.questions.map((q: any) => {
+          if (q.id !== questionId) return q;
+          const currentArr = [...(q[field] || [])];
+          currentArr[index] = val;
+          return {
+            ...q,
+            [field]: currentArr
+          };
+        })
+      };
+    }));
   };
 
   const handlePublish = async (id: number) => {
@@ -112,6 +350,7 @@ export default function SurveysManagerPage() {
       loadSurveys();
     } catch (err) {
       console.error("Error deleting:", err);
+      alert("Lỗi khi xóa khảo sát.");
     }
   };
 
@@ -146,9 +385,9 @@ export default function SurveysManagerPage() {
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-md border-b border-outline-variant/30 pb-md">
         <div>
-          <h1 className="font-headline-lg text-headline-lg text-primary font-bold">Quản lý Khảo sát (Survey Builder)</h1>
+          <h1 className="font-headline-lg text-headline-lg text-primary font-bold">Quản lý Khảo sát</h1>
           <p className="font-body-md text-body-md text-on-surface-variant mt-xs">
-            Thiết kế câu hỏi, phân phối đối tượng khảo sát và quản lý trạng thái các chiến dịch đánh giá chất lượng.
+            Tạo lập và quản lý các biểu mẫu khảo sát chất lượng giảng dạy, cơ sở vật chất.
           </p>
         </div>
         <button
@@ -220,38 +459,53 @@ export default function SurveysManagerPage() {
                 </div>
               </div>
 
-              <div className="border-t border-outline-variant/30 pt-sm mt-md flex justify-between items-center gap-sm">
-                {survey.status === "draft" && (
-                  <button
-                    onClick={() => handlePublish(survey.id)}
-                    className="text-xs font-bold text-emerald-600 hover:underline flex items-center gap-0.5 cursor-pointer"
-                  >
-                    <span className="material-symbols-outlined text-[16px]">publish</span>
-                    Phát hành
-                  </button>
+              <div className="border-t border-outline-variant/30 pt-sm mt-md flex flex-wrap justify-between items-center gap-sm">
+                {survey.status === "draft" ? (
+                  <>
+                    <button
+                      onClick={() => handlePublish(survey.id)}
+                      className="text-xs font-bold text-emerald-600 hover:underline flex items-center gap-0.5 cursor-pointer"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">publish</span>
+                      Phát hành
+                    </button>
+                    <button
+                      onClick={() => handleStartEdit(survey)}
+                      className="text-xs font-bold text-amber-600 hover:underline flex items-center gap-0.5 cursor-pointer"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">edit</span>
+                      Chỉnh sửa
+                    </button>
+                    <button
+                      onClick={() => handleDelete(survey.id)}
+                      className="text-xs font-bold text-error hover:underline flex items-center gap-0.5 cursor-pointer"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">delete</span>
+                      Xóa
+                    </button>
+                  </>
+                ) : (
+                  // Khảo sát đã public hoặc closed thì KHÔNG cho chỉnh sửa / xóa
+                  <>
+                    {survey.status === "published" && (
+                      <button
+                        onClick={() => handleClose(survey.id)}
+                        className="text-xs font-bold text-slate-600 hover:underline flex items-center gap-0.5 cursor-pointer"
+                      >
+                        <span className="material-symbols-outlined text-[16px]">cancel</span>
+                        Đóng lại
+                      </button>
+                    )}
+                    <span className="text-[11px] italic text-on-surface-variant">Không thể chỉnh sửa</span>
+                  </>
                 )}
-                {survey.status === "published" && (
-                  <button
-                    onClick={() => handleClose(survey.id)}
-                    className="text-xs font-bold text-slate-600 hover:underline flex items-center gap-0.5 cursor-pointer"
-                  >
-                    <span className="material-symbols-outlined text-[16px]">cancel</span>
-                    Đóng lại
-                  </button>
-                )}
+                
                 <button
                   onClick={() => handleDuplicate(survey.id)}
-                  className="text-xs font-bold text-primary hover:underline flex items-center gap-0.5 cursor-pointer"
+                  className="text-xs font-bold text-primary hover:underline flex items-center gap-0.5 cursor-pointer ml-auto"
                 >
                   <span className="material-symbols-outlined text-[16px]">content_copy</span>
                   Sao chép
-                </button>
-                <button
-                  onClick={() => handleDelete(survey.id)}
-                  className="text-xs font-bold text-error hover:underline flex items-center gap-0.5 cursor-pointer ml-auto"
-                >
-                  <span className="material-symbols-outlined text-[16px]">delete</span>
-                  Xóa
                 </button>
               </div>
             </div>
@@ -330,6 +584,372 @@ export default function SurveysManagerPage() {
                   Tạo bản nháp
                 </button>
               </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Survey / Survey Builder Modal */}
+      {editingSurvey && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-md">
+          <div className="fixed inset-0 bg-black/45 backdrop-blur-sm" onClick={() => setEditingSurvey(null)}></div>
+          <div className="relative bg-surface rounded-xl border border-outline-variant/30 shadow-2xl p-lg md:p-xl max-w-[850px] w-full max-h-[90vh] flex flex-col gap-md z-10 animate-in fade-in zoom-in-95 duration-200 overflow-hidden">
+            <div className="flex items-center justify-between border-b border-outline-variant/40 pb-sm">
+              <h3 className="font-headline-md text-headline-md text-primary font-bold">
+                Trình Thiết kế Khảo sát (Survey Builder)
+              </h3>
+              <button 
+                onClick={() => setEditingSurvey(null)}
+                className="text-on-surface-variant hover:text-on-surface cursor-pointer flex items-center justify-center"
+              >
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEdit} className="flex-1 flex flex-col gap-lg overflow-y-auto pr-xs">
+              
+              {/* Metadata Settings */}
+              <div className="bg-surface-container-low p-md rounded-xl border border-outline-variant/40 grid grid-cols-1 md:grid-cols-2 gap-md">
+                <div className="flex flex-col gap-xs">
+                  <label className="text-xs font-bold text-on-surface-variant">Tiêu đề khảo sát</label>
+                  <input
+                    type="text"
+                    required
+                    value={editTitle}
+                    onChange={(e) => setEditTitle(e.target.value)}
+                    className="p-2 bg-surface-container-lowest border border-outline-variant rounded-lg font-body-md focus:border-primary focus:outline-none"
+                  />
+                </div>
+                <div className="flex flex-col gap-xs">
+                  <label className="text-xs font-bold text-on-surface-variant">Đối tượng khảo sát</label>
+                  <select
+                    value={editTargetRole}
+                    onChange={(e) => setEditTargetRole(e.target.value)}
+                    className="p-2 bg-surface-container-lowest border border-outline-variant rounded-lg font-body-md focus:border-primary focus:outline-none"
+                  >
+                    <option value="STUDENT">Sinh viên</option>
+                    <option value="ALUMNI">Cựu sinh viên</option>
+                    <option value="EMPLOYER">Nhà tuyển dụng</option>
+                    <option value="LECTURER">Giảng viên</option>
+                  </select>
+                </div>
+                <div className="flex flex-col gap-xs md:col-span-2">
+                  <label className="text-xs font-bold text-on-surface-variant">Mô tả chi tiết</label>
+                  <textarea
+                    value={editDescription}
+                    onChange={(e) => setEditDescription(e.target.value)}
+                    rows={2}
+                    className="p-2 bg-surface-container-lowest border border-outline-variant rounded-lg font-body-md focus:border-primary focus:outline-none resize-none"
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="flex items-center gap-md cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={editIsAnonymous}
+                      onChange={(e) => setEditIsAnonymous(e.target.checked)}
+                      className="w-[18px] h-[18px] text-primary border-outline-variant rounded focus:ring-primary cursor-pointer"
+                    />
+                    <span className="text-xs font-bold text-on-surface-variant">Khảo sát ẩn danh (Không lưu danh tính người làm)</span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Sections & Questions Builder */}
+              <div className="space-y-lg">
+                <div className="flex justify-between items-center">
+                  <h4 className="font-label-md text-label-md text-on-surface font-bold uppercase tracking-wider">Cấu trúc câu hỏi</h4>
+                  <button
+                    type="button"
+                    onClick={addSection}
+                    className="bg-primary/10 text-primary hover:bg-primary/20 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">add_circle</span>
+                    Thêm phần mới
+                  </button>
+                </div>
+
+                {editSections.map((section, sIdx) => (
+                  <div key={section.id} className="border border-outline-variant/60 rounded-xl p-md bg-surface-container-lowest shadow-sm space-y-md">
+                    {/* Section Header */}
+                    <div className="flex justify-between items-start gap-md">
+                      <div className="flex-1 space-y-xs">
+                        <input
+                          type="text"
+                          required
+                          placeholder="Tiêu đề phần (ví dụ: Phần 1: Đánh giá môn học)"
+                          value={section.title}
+                          onChange={(e) => updateSectionField(section.id, "title", e.target.value)}
+                          className="w-full text-base font-bold text-primary bg-transparent border-b border-outline-variant/30 focus:border-primary focus:outline-none pb-0.5"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Mô tả ngắn cho phần này (không bắt buộc)"
+                          value={section.description || ""}
+                          onChange={(e) => updateSectionField(section.id, "description", e.target.value)}
+                          className="w-full text-xs text-on-surface-variant bg-transparent border-none focus:outline-none"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => removeSection(section.id)}
+                        className="text-error hover:bg-error/10 p-1.5 rounded-full flex items-center justify-center cursor-pointer"
+                        title="Xóa phần này"
+                      >
+                        <span className="material-symbols-outlined text-[20px]">delete_forever</span>
+                      </button>
+                    </div>
+
+                    {/* Questions in Section */}
+                    <div className="space-y-md border-l-2 border-primary/20 pl-md">
+                      {section.questions.map((q: any, qIdx: number) => (
+                        <div key={q.id} className="bg-surface-container-low border border-outline-variant/30 rounded-lg p-md space-y-sm">
+                          
+                          {/* Question Base Fields */}
+                          <div className="flex flex-col sm:flex-row gap-sm justify-between sm:items-center">
+                            <span className="text-xs font-bold text-primary">Câu hỏi {qIdx + 1}</span>
+                            <div className="flex items-center gap-sm">
+                              <label className="flex items-center gap-xs cursor-pointer select-none">
+                                <input
+                                  type="checkbox"
+                                  checked={q.required}
+                                  onChange={(e) => updateQuestionField(section.id, q.id, "required", e.target.checked)}
+                                  className="w-[14px] h-[14px] cursor-pointer"
+                                />
+                                <span className="text-xs font-semibold text-on-surface-variant">Bắt buộc</span>
+                              </label>
+                              <button
+                                type="button"
+                                onClick={() => removeQuestion(section.id, q.id)}
+                                className="text-error hover:bg-error/10 p-1 rounded-full flex items-center justify-center cursor-pointer"
+                                title="Xóa câu hỏi"
+                              >
+                                <span className="material-symbols-outlined text-[16px]">close</span>
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-4 gap-sm">
+                            <div className="sm:col-span-3">
+                              <input
+                                type="text"
+                                required
+                                placeholder="Nhập câu hỏi..."
+                                value={q.label}
+                                onChange={(e) => updateQuestionField(section.id, q.id, "label", e.target.value)}
+                                className="w-full p-2 bg-surface-container-lowest border border-outline-variant rounded-lg text-sm focus:border-primary focus:outline-none"
+                              />
+                            </div>
+                            <div>
+                              <select
+                                value={q.type}
+                                onChange={(e) => updateQuestionField(section.id, q.id, "type", e.target.value)}
+                                className="w-full p-2 bg-surface-container-lowest border border-outline-variant rounded-lg text-xs font-semibold focus:border-primary focus:outline-none h-full"
+                              >
+                                <option value="likert">Likert (1-5)</option>
+                                <option value="single_choice">Một lựa chọn (Radio)</option>
+                                <option value="multiple_choice">Nhiều lựa chọn (Checkbox)</option>
+                                <option value="matrix">Ma trận đánh giá (Matrix)</option>
+                                <option value="nps">NPS (0-10)</option>
+                                <option value="open_ended">Câu hỏi mở (Textarea)</option>
+                              </select>
+                            </div>
+                          </div>
+
+                          {/* Question Custom Configs */}
+                          {(q.type === "likert" || q.type === "nps") && (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-sm pt-xs">
+                              <div className="flex items-center gap-xs">
+                                <span className="text-[11px] font-semibold text-on-surface-variant shrink-0">Nhãn nhỏ nhất:</span>
+                                <input
+                                  type="text"
+                                  value={q.min_label || ""}
+                                  onChange={(e) => updateQuestionField(section.id, q.id, "min_label", e.target.value)}
+                                  className="w-full p-1 text-xs bg-surface-container-lowest border border-outline-variant rounded focus:outline-none"
+                                />
+                              </div>
+                              <div className="flex items-center gap-xs">
+                                <span className="text-[11px] font-semibold text-on-surface-variant shrink-0">Nhãn lớn nhất:</span>
+                                <input
+                                  type="text"
+                                  value={q.max_label || ""}
+                                  onChange={(e) => updateQuestionField(section.id, q.id, "max_label", e.target.value)}
+                                  className="w-full p-1 text-xs bg-surface-container-lowest border border-outline-variant rounded focus:outline-none"
+                                />
+                              </div>
+                            </div>
+                          )}
+
+                          {(q.type === "single_choice" || q.type === "multiple_choice") && (
+                            <div className="space-y-xs pt-xs">
+                              <div className="flex justify-between items-center">
+                                <span className="text-[11px] font-bold text-on-surface-variant">Lựa chọn trả lời:</span>
+                                {q.type === "multiple_choice" && (
+                                  <div className="flex items-center gap-xs">
+                                    <span className="text-[10px] font-semibold text-on-surface-variant">Giới hạn lựa chọn tối đa:</span>
+                                    <input
+                                      type="number"
+                                      value={q.max_selections || ""}
+                                      placeholder="Không giới hạn"
+                                      onChange={(e) => updateQuestionField(section.id, q.id, "max_selections", e.target.value ? parseInt(e.target.value) : undefined)}
+                                      className="w-16 p-1 text-xs bg-surface-container-lowest border border-outline-variant rounded focus:outline-none"
+                                    />
+                                  </div>
+                                )}
+                              </div>
+                              <div className="flex flex-wrap gap-xs">
+                                {q.options?.map((opt: string, optIdx: number) => (
+                                  <div key={optIdx} className="flex items-center gap-1 bg-surface-container-lowest border border-outline-variant/60 rounded px-1.5 py-0.5">
+                                    <input
+                                      type="text"
+                                      value={opt}
+                                      onChange={(e) => updateArrayValue(section.id, q.id, "options", optIdx, e.target.value)}
+                                      className="text-xs bg-transparent border-none focus:outline-none w-24"
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={() => removeArrayValue(section.id, q.id, "options", optIdx)}
+                                      className="text-error text-xs hover:bg-error/10 rounded flex items-center justify-center p-0.5 cursor-pointer"
+                                    >
+                                      <span className="material-symbols-outlined text-[12px] font-bold">close</span>
+                                    </button>
+                                  </div>
+                                ))}
+                                <button
+                                  type="button"
+                                  onClick={() => addArrayValue(section.id, q.id, "options")}
+                                  className="text-[10px] font-bold text-primary bg-primary/5 hover:bg-primary/10 border border-primary/20 rounded px-2 py-0.5 flex items-center gap-0.5 cursor-pointer"
+                                >
+                                  <span className="material-symbols-outlined text-[10px] font-bold">add</span> Thêm lựa chọn
+                                </button>
+                              </div>
+                            </div>
+                          )}
+
+                          {q.type === "matrix" && (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-md pt-xs border-t border-outline-variant/20">
+                              
+                              {/* Matrix Rows */}
+                              <div className="space-y-xs">
+                                <span className="text-[11px] font-bold text-on-surface-variant block">Các tiêu chí (Hàng):</span>
+                                <div className="flex flex-wrap gap-xs">
+                                  {q.rows?.map((row: string, rIdx: number) => (
+                                    <div key={rIdx} className="flex items-center gap-1 bg-surface-container-lowest border border-outline-variant/60 rounded px-1.5 py-0.5">
+                                      <input
+                                        type="text"
+                                        value={row}
+                                        onChange={(e) => updateArrayValue(section.id, q.id, "rows", rIdx, e.target.value)}
+                                        className="text-xs bg-transparent border-none focus:outline-none w-24"
+                                      />
+                                      <button
+                                        type="button"
+                                        onClick={() => removeArrayValue(section.id, q.id, "rows", rIdx)}
+                                        className="text-error text-xs hover:bg-error/10 rounded p-0.5 cursor-pointer"
+                                      >
+                                        <span className="material-symbols-outlined text-[12px]">close</span>
+                                      </button>
+                                    </div>
+                                  ))}
+                                  <button
+                                    type="button"
+                                    onClick={() => addArrayValue(section.id, q.id, "rows")}
+                                    className="text-[10px] font-bold text-primary bg-primary/5 border border-primary/20 rounded px-2 py-0.5 cursor-pointer"
+                                  >
+                                    + Thêm hàng
+                                  </button>
+                                </div>
+                              </div>
+
+                              {/* Matrix Columns */}
+                              <div className="space-y-xs">
+                                <span className="text-[11px] font-bold text-on-surface-variant block">Mức đánh giá (Cột):</span>
+                                <div className="flex flex-wrap gap-xs">
+                                  {q.columns?.map((col: string, cIdx: number) => (
+                                    <div key={cIdx} className="flex items-center gap-1 bg-surface-container-lowest border border-outline-variant/60 rounded px-1.5 py-0.5">
+                                      <input
+                                        type="text"
+                                        value={col}
+                                        onChange={(e) => updateArrayValue(section.id, q.id, "columns", cIdx, e.target.value)}
+                                        className="text-xs bg-transparent border-none focus:outline-none w-20"
+                                      />
+                                      <button
+                                        type="button"
+                                        onClick={() => removeArrayValue(section.id, q.id, "columns", cIdx)}
+                                        className="text-error text-xs hover:bg-error/10 rounded p-0.5 cursor-pointer"
+                                      >
+                                        <span className="material-symbols-outlined text-[12px]">close</span>
+                                      </button>
+                                    </div>
+                                  ))}
+                                  <button
+                                    type="button"
+                                    onClick={() => addArrayValue(section.id, q.id, "columns")}
+                                    className="text-[10px] font-bold text-primary bg-primary/5 border border-primary/20 rounded px-2 py-0.5 cursor-pointer"
+                                  >
+                                    + Thêm cột
+                                  </button>
+                                </div>
+                              </div>
+
+                            </div>
+                          )}
+
+                          {q.type === "open_ended" && (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-sm pt-xs">
+                              <div className="flex items-center gap-xs">
+                                <span className="text-[11px] font-semibold text-on-surface-variant shrink-0">Placeholder:</span>
+                                <input
+                                  type="text"
+                                  value={q.placeholder || ""}
+                                  onChange={(e) => updateQuestionField(section.id, q.id, "placeholder", e.target.value)}
+                                  className="w-full p-1 text-xs bg-surface-container-lowest border border-outline-variant rounded focus:outline-none"
+                                />
+                              </div>
+                              <div className="flex items-center gap-xs">
+                                <span className="text-[11px] font-semibold text-on-surface-variant shrink-0">Ký tự tối đa:</span>
+                                <input
+                                  type="number"
+                                  value={q.max_length || 1000}
+                                  onChange={(e) => updateQuestionField(section.id, q.id, "max_length", parseInt(e.target.value) || 1000)}
+                                  className="w-24 p-1 text-xs bg-surface-container-lowest border border-outline-variant rounded focus:outline-none"
+                                />
+                              </div>
+                            </div>
+                          )}
+
+                        </div>
+                      ))}
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => addQuestion(section.id)}
+                      className="w-full py-2 bg-primary/5 text-primary border border-dashed border-primary/30 rounded-lg text-xs font-bold flex items-center justify-center gap-1 hover:bg-primary/10 cursor-pointer transition-colors"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">add</span>
+                      Thêm câu hỏi mới vào phần này
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              {/* Form Footer */}
+              <div className="flex justify-end gap-sm border-t border-outline-variant/40 pt-md mt-md">
+                <button
+                  type="button"
+                  onClick={() => setEditingSurvey(null)}
+                  className="px-6 py-2.5 border border-outline-variant rounded-lg text-label-md font-bold text-on-surface hover:bg-surface-container-low transition-colors cursor-pointer"
+                >
+                  Đóng lại
+                </button>
+                <button
+                  type="submit"
+                  className="px-6 py-2.5 bg-primary text-on-primary rounded-lg text-label-md font-bold hover:bg-primary-container hover:text-on-primary-container transition-colors shadow-sm cursor-pointer"
+                >
+                  Lưu cấu hình
+                </button>
+              </div>
+
             </form>
           </div>
         </div>

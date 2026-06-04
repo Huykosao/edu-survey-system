@@ -33,7 +33,8 @@ export default function UserManagementPage() {
   // Form states for new user
   const [newName, setNewName] = useState("");
   const [newEmail, setNewEmail] = useState("");
-  const [newRole, setNewRole] = useState<"Sinh viên" | "Giảng viên" | "Quản lý" | "Quản trị viên">("Sinh viên");
+  const [newPassword, setNewPassword] = useState("");
+  const [newRole, setNewRole] = useState<"Sinh viên" | "Giảng viên" | "Quản lý" | "Quản trị viên" | "Cựu sinh viên" | "Nhà tuyển dụng">("Sinh viên");
 
   // Users Data
   const [users, setUsers] = useState<User[]>([]);
@@ -48,6 +49,9 @@ export default function UserManagementPage() {
           if (u.roles[0] === "ADMIN") role = "Quản trị viên";
           else if (u.roles[0] === "MANAGER") role = "Quản lý";
           else if (u.roles[0] === "LECTURER") role = "Giảng viên";
+          else if (u.roles[0] === "STUDENT") role = "Sinh viên";
+          else if (u.roles[0] === "ALUMNI") role = "Cựu sinh viên";
+          else if (u.roles[0] === "EMPLOYER") role = "Nhà tuyển dụng";
         }
         return {
           id: u.id.toString(),
@@ -104,22 +108,25 @@ export default function UserManagementPage() {
 
   const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newName || !newEmail) return;
+    if (!newName || !newEmail || !newPassword) return;
 
-    let roleIds = [1]; // DEFAULT student
-    if (newRole === "Quản trị viên") roleIds = [4];
-    else if (newRole === "Quản lý") roleIds = [3];
-    else if (newRole === "Giảng viên") roleIds = [2];
+    let roleIds = [4]; // STUDENT
+    if (newRole === "Quản trị viên") roleIds = [1];
+    else if (newRole === "Quản lý") roleIds = [2];
+    else if (newRole === "Giảng viên") roleIds = [3];
+    else if (newRole === "Cựu sinh viên") roleIds = [5];
+    else if (newRole === "Nhà tuyển dụng") roleIds = [6];
 
     try {
       await usersApi.create({
         full_name: newName,
         email: newEmail,
-        password: "Password@123", // Default password
+        password: newPassword,
         role_ids: roleIds
       });
       setNewName("");
       setNewEmail("");
+      setNewPassword("");
       setNewRole("Sinh viên");
       setShowAddModal(false);
       loadUsers();
@@ -375,6 +382,18 @@ export default function UserManagementPage() {
                 />
               </div>
               <div className="flex flex-col gap-xs">
+                <label className="text-label-md font-semibold text-on-surface-variant" htmlFor="user-password">Mật khẩu</label>
+                <input
+                  id="user-password"
+                  type="password"
+                  required
+                  placeholder="Nhập mật khẩu..."
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="w-full p-2.5 bg-surface-container-lowest border border-outline-variant rounded-lg font-body-md focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                />
+              </div>
+              <div className="flex flex-col gap-xs">
                 <label className="text-label-md font-semibold text-on-surface-variant" htmlFor="user-role">Vai trò</label>
                 <select
                   id="user-role"
@@ -386,6 +405,8 @@ export default function UserManagementPage() {
                   <option>Giảng viên</option>
                   <option>Quản lý</option>
                   <option>Quản trị viên</option>
+                  <option>Cựu sinh viên</option>
+                  <option>Nhà tuyển dụng</option>
                 </select>
               </div>
               <div className="flex gap-sm justify-end mt-lg">
