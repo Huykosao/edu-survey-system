@@ -19,6 +19,25 @@ export default function AdminLayout({
   const roles = user?.roles || [];
   const primaryRole = roles[0] || "";
 
+  // Check sub-page permissions
+  const hasAdmin = roles.includes("ADMIN");
+  const hasManager = roles.includes("MANAGER");
+  const hasLecturer = roles.includes("LECTURER");
+
+  const adminOnlyPaths = ["/admin/users", "/admin/master-data", "/admin/permissions", "/admin/logs"];
+  const managerOnlyPaths = ["/admin/surveys", "/admin/clarifications", "/admin/approvals", "/admin/reports"];
+  const lecturerOnlyPaths = ["/admin/my-clarifications"];
+
+  const isTryingAdminPath = adminOnlyPaths.some(path => pathname === path || pathname?.startsWith(path + "/"));
+  const isTryingManagerPath = managerOnlyPaths.some(path => pathname === path || pathname?.startsWith(path + "/"));
+  const isTryingLecturerPath = lecturerOnlyPaths.some(path => pathname === path || pathname?.startsWith(path + "/"));
+
+  const isAuthorized = isAuthenticated && (
+    hasAdmin ||
+    (hasManager && !isTryingAdminPath) ||
+    (hasLecturer && !isTryingAdminPath && !isTryingManagerPath)
+  );
+
   // Protect admin routes and verify permissions
   useEffect(() => {
     if (!isLoading) {
@@ -29,23 +48,10 @@ export default function AdminLayout({
 
       // Check if student, alumni, or employer trying to access admin
       const isSurveyUser = roles.includes("STUDENT") || roles.includes("ALUMNI") || roles.includes("EMPLOYER");
-      if (isSurveyUser && !roles.includes("ADMIN") && !roles.includes("MANAGER") && !roles.includes("LECTURER")) {
+      if (isSurveyUser && !hasAdmin && !hasManager && !hasLecturer) {
         router.push("/survey");
         return;
       }
-
-      // Check sub-page permissions
-      const hasAdmin = roles.includes("ADMIN");
-      const hasManager = roles.includes("MANAGER");
-      const hasLecturer = roles.includes("LECTURER");
-
-      const adminOnlyPaths = ["/admin/users", "/admin/master-data", "/admin/permissions", "/admin/logs"];
-      const managerOnlyPaths = ["/admin/surveys", "/admin/clarifications", "/admin/approvals", "/admin/reports"];
-      const lecturerOnlyPaths = ["/admin/my-clarifications"];
-
-      const isTryingAdminPath = adminOnlyPaths.some(path => pathname === path || pathname?.startsWith(path + "/"));
-      const isTryingManagerPath = managerOnlyPaths.some(path => pathname === path || pathname?.startsWith(path + "/"));
-      const isTryingLecturerPath = lecturerOnlyPaths.some(path => pathname === path || pathname?.startsWith(path + "/"));
 
       if (isTryingAdminPath && !hasAdmin) {
         router.push("/403");
@@ -55,7 +61,19 @@ export default function AdminLayout({
         router.push("/403");
       }
     }
-  }, [isLoading, isAuthenticated, roles, pathname, router]);
+  }, [
+    isLoading,
+    isAuthenticated,
+    roles,
+    pathname,
+    router,
+    hasAdmin,
+    hasManager,
+    hasLecturer,
+    isTryingAdminPath,
+    isTryingManagerPath,
+    isTryingLecturerPath,
+  ]);
 
   // Define sidebar menu based on roles
   const getMenuItems = () => {

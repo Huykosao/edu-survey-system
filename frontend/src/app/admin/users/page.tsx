@@ -227,7 +227,7 @@ export default function UserManagementPage() {
                 {/* Locked overlay effect */}
                 {isLocked && <div className="absolute inset-0 bg-surface-container-highest opacity-25 pointer-events-none z-0 rounded-xl"></div>}
 
-                <div className="flex justify-between items-start mb-md relative z-50">
+                <div className="flex justify-between items-start mb-md relative z-10">
                   <div className="flex items-center gap-md">
                     <div
                       className={`w-12 h-12 rounded-full flex items-center justify-center font-headline-md font-bold text-lg border ${
