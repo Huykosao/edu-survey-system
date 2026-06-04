@@ -22,7 +22,7 @@ class CreateSurveyRequest(BaseModel):
         default_factory=SurveyContent,
         description="Cấu trúc khảo sát gồm sections và câu hỏi theo chuẩn 5 dạng"
     )
-    status: str = Field("draft", pattern="^(draft|published|closed)$")
+    status: SurveyStatus = SurveyStatus.DRAFT
     is_anonymous: bool = True
     target_config: dict = Field(default_factory=dict)
 
