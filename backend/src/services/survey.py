@@ -72,10 +72,14 @@ def _validate_answers(answers: dict, content: SurveyContent) -> None:
             if not isinstance(answer, dict):
                 errors.append(f"Câu hỏi '{q.id}' (Matrix): câu trả lời phải là object {{row: column}}.")
             else:
+                if q.required:
+                    missing_rows = [r for r in q.rows if r not in answer]
+                    if missing_rows:
+                        errors.append(f"Câu hỏi '{q.id}' (Matrix): thiếu câu trả lời cho các tiêu chí: {missing_rows}")
                 for row, val in answer.items():
                     if row not in q.rows:
                         errors.append(f"Câu hỏi '{q.id}' (Matrix): tiêu chí '{row}' không tồn tại.")
-                    if val not in q.columns:
+                    elif val not in q.columns:
                         errors.append(f"Câu hỏi '{q.id}' (Matrix): giá trị '{val}' cho tiêu chí '{row}' không hợp lệ.")
 
         elif q.type == QuestionType.OPEN_ENDED:
@@ -196,6 +200,9 @@ def submit_survey_response(survey_id: int, data: dict, user_id: int) -> dict:
         raw_text = data.get("raw_content_text", "")
 
     is_anon = survey.get("is_anonymous", True)
+    if not is_anon:
+        if survey_repo.get_my_response(survey_id, user_id):
+            raise HTTPException(status_code=400, detail="Bạn đã gửi phản hồi cho khảo sát này rồi.")
     resp_data = {
         "survey_id": survey_id,
         "user_id": None if is_anon else user_id,

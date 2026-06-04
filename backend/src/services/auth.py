@@ -5,9 +5,11 @@ Business logic cho xác thực: hash password, tạo token, tạo user mới.
 """
 
 import bcrypt
+from fastapi import HTTPException
 from src.models.user import CreateUserRequest
 from src.schemas.user import NewUserRow
 from src.repositories.user import create_user
+from src.share.types import get_allowed_domains
 
 
 def hash_password(plain_password: str) -> bytes:
@@ -32,6 +34,15 @@ def verify_password(plain_password: str, hashed_password: bytes) -> bool:
 
 def create_user_service(req: CreateUserRequest) -> dict:
     """Tạo user mới từ request — hash password rồi lưu DB."""
+    # Validate email domain at the service layer
+    allowed_domains = get_allowed_domains()
+    domain = req.email.split("@")[-1]
+    if domain not in allowed_domains:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Email domain '{domain}' is not allowed."
+        )
+
     new_user = NewUserRow(
         full_name=req.full_name,
         email=req.email,

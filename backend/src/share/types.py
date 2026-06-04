@@ -24,14 +24,7 @@ def get_allowed_domains() -> set[str]:
         _allowed_domains_last_fetch = now
     return _allowed_domains_cache
 
-def check_domain(email: EmailStr) -> EmailStr:
-    allowed_domains = get_allowed_domains()
-    domain = email.split("@")[-1]
-    if domain not in allowed_domains:
-        raise ValueError(f"Email domain '{domain}' is not allowed.")
-    return email
-
-ValidEmail = Annotated[EmailStr, AfterValidator(check_domain)]
+ValidEmail = EmailStr
 
 
 from enum import Enum
