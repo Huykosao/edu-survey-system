@@ -1,7 +1,3 @@
-Với bộ **User Story** và **Database Schema** hiện tại, mình khuyến nghị thiết kế API theo **luồng nghiệp vụ (workflow)** thay vì chỉ theo bảng dữ liệu. Điều này giúp frontend và backend phát triển dễ hơn, đồng thời phản ánh đúng quy trình khảo sát của trường.
-
----
-
 # 1. Authentication Module
 
 ## 1.1 Đăng nhập / Đăng xuất
@@ -31,10 +27,10 @@ Với bộ **User Story** và **Database Schema** hiện tại, mình khuyến n
 
 ### Chức năng
 
-* Tạo tài khoản
-* Khóa tài khoản
-* Mở khóa tài khoản
-* Cập nhật thông tin
+- Tạo tài khoản
+- Khóa tài khoản
+- Mở khóa tài khoản
+- Cập nhật thông tin
 
 ---
 
@@ -193,8 +189,8 @@ target_config
 
 Quyền:
 
-* Manager
-* Admin
+- Manager
+- Admin
 
 ---
 
@@ -536,5 +532,3 @@ Phục vụ US-16 → US-19.
 12. Lecturer Response
 13. Improvement Announcement
 14. Audit Logs
-
-Đây là thứ tự phù hợp nhất với schema hiện tại vì toàn bộ luồng chính **Tạo khảo sát → Phát hành → Thu thập phản hồi → Thống kê → Báo cáo** sẽ hoàn thiện trước, sau đó mới bổ sung các tính năng AI và quy trình giải trình nâng cao.
