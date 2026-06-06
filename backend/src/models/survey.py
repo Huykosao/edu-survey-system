@@ -8,14 +8,7 @@ Request/Response models cho các endpoint khảo sát và phản hồi.
 from pydantic import BaseModel, Field, field_validator
 from typing import Optional, Any
 from datetime import datetime
-from enum import Enum
-
-from src.schemas.survey import SurveyContent
-
-class SurveyStatus(Enum):
-    DRAFT = "draft"
-    PUBLISHED = "published"
-    CLOSED = "closed"
+from src.schemas.survey import SurveyContent, SurveyStatus
 
 # ── Survey Requests ───────────────────────────────────────────────────────────
 
