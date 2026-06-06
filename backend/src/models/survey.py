@@ -8,9 +8,14 @@ Request/Response models cho các endpoint khảo sát và phản hồi.
 from pydantic import BaseModel, Field, field_validator
 from typing import Optional, Any
 from datetime import datetime
+from enum import Enum
 
 from src.schemas.survey import SurveyContent
 
+class SurveyStatus(Enum):
+    DRAFT = "draft"
+    PUBLISHED = "published"
+    CLOSED = "closed"
 
 # ── Survey Requests ───────────────────────────────────────────────────────────
 
@@ -39,7 +44,7 @@ class UpdateSurveyRequest(BaseModel):
         None,
         description="Cập nhật cấu trúc câu hỏi — phải tuân thủ schema 5 dạng"
     )
-    status: Optional[str] = Field(None, pattern="^(draft|published|closed)$")
+    status: Optional[SurveyStatus] = Field(None)
     is_anonymous: Optional[bool] = None
     target_config: Optional[dict] = None
 
