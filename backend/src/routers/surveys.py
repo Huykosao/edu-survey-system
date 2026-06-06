@@ -9,6 +9,7 @@ from src.core.security import get_current_user
 from src.core.middleware import require_manager
 from src.models.survey import (
     CreateSurveyRequest,
+    SurveyStatus,
     UpdateSurveyRequest,
     SubmitSurveyResponseRequest,
     SurveyResponse,
@@ -50,17 +51,27 @@ def get_survey(sid: int, _: dict = Depends(get_current_user)):
 
 
 @router.post("/surveys", response_model=SurveyResponse)
-def create_survey(req: CreateSurveyRequest, current_user: dict = Depends(require_manager)):
-    """Tạo khảo sát mới. [MANAGER, ADMIN]"""
-    data = req.model_dump(exclude={"content"})
+def create_survey(
+    req: CreateSurveyRequest,
+    current_user: dict = Depends(require_manager)
+):
+    data = req.model_dump(mode="json", exclude={"content"})
     data["content"] = req.content_as_dict()
-    return survey_svc.create_new_survey(data, current_user["id"])
+
+    return survey_svc.create_new_survey(
+        data,
+        current_user["id"]
+    )
 
 
 @router.put("/surveys/{sid}", response_model=SurveyResponse)
 def update_survey(sid: int, req: UpdateSurveyRequest, _: dict = Depends(require_manager)):
     """Cập nhật khảo sát. [MANAGER, ADMIN]"""
-    data = req.model_dump(exclude_none=True, exclude={"content"})
+    data = req.model_dump(
+        mode="json",
+        exclude_none=True,
+        exclude={"content"}
+    )
     content_dict = req.content_as_dict()
     if content_dict is not None:
         data["content"] = content_dict
@@ -77,13 +88,13 @@ def delete_survey_endpoint(sid: int, _: dict = Depends(require_manager)):
 @router.post("/surveys/{sid}/publish", response_model=SurveyResponse)
 def publish_survey(sid: int, _: dict = Depends(require_manager)):
     """Phát hành khảo sát. [MANAGER, ADMIN]"""
-    return update_survey_status(sid, "published")
+    return update_survey_status(sid, SurveyStatus.PUBLISHED.value)
 
 
 @router.post("/surveys/{sid}/close", response_model=SurveyResponse)
 def close_survey(sid: int, _: dict = Depends(require_manager)):
     """Đóng khảo sát. [MANAGER, ADMIN]"""
-    return update_survey_status(sid, "closed")
+    return update_survey_status(sid, SurveyStatus.CLOSED.value)
 
 
 @router.post("/surveys/{sid}/duplicate", response_model=SurveyResponse)
