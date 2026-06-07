@@ -154,12 +154,19 @@ def list_responses_with_filters(survey_id: int, segment_type: str = "OVERALL", s
     query = supabase_client.table("survey_responses").select("*, users!inner(id, profile_details(*))").eq("survey_id", survey_id)
     
     # Lọc theo Môn học
+    # Lọc theo Môn học
     if segment_type == "SUBJECT" and segment_value != "ALL":
-        query = query.eq("subject_id", int(segment_value))
+        try:
+            query = query.eq("subject_id", int(segment_value))
+        except ValueError:
+            raise HTTPException(status_code=400, detail="ID môn học không hợp lệ")
     
     # Lọc theo Khoa (thông qua bảng profile_details của user)
     elif segment_type == "FACULTY" and segment_value != "ALL":
-        query = query.eq("users.profile_details.faculty_id", int(segment_value))
+        try:
+            query = query.eq("users.profile_details.faculty_id", int(segment_value))
+        except ValueError:
+            raise HTTPException(status_code=400, detail="ID khoa không hợp lệ")
     
     result = query.execute()
     return result.data or []
