@@ -3,10 +3,13 @@ routers/surveys.py  (v2 — typed request/response models)
 """
 
 from fastapi import APIRouter, Depends, Query
-from typing import Optional
+from typing import Optional, Literal
 
 from src.core.security import get_current_user
-from src.core.middleware import require_manager
+from src.core.middleware import (
+    require_admin_or_manager,
+    require_manager
+)
 from src.models.survey import (
     CreateSurveyRequest,
     SurveyStatus,
@@ -38,7 +41,7 @@ router = APIRouter(
 @router.get("/surveys", response_model=SurveyListResponse)
 def list_surveys(
     status: Optional[str] = Query(None),
-    _: dict = Depends(require_manager),
+    _: dict = Depends(require_admin_or_manager),
 ):
     """Danh sách tất cả khảo sát. [MANAGER, ADMIN]"""
     return survey_svc.get_all_surveys(status)
@@ -53,7 +56,7 @@ def get_survey(sid: int, _: dict = Depends(get_current_user)):
 @router.post("/surveys", response_model=SurveyResponse)
 def create_survey(
     req: CreateSurveyRequest,
-    current_user: dict = Depends(require_manager)
+    current_user: dict = Depends(require_admin_or_manager)
 ):
     data = req.model_dump(mode="json", exclude={"content"})
     data["content"] = req.content_as_dict()
@@ -65,7 +68,7 @@ def create_survey(
 
 
 @router.put("/surveys/{sid}", response_model=SurveyResponse)
-def update_survey(sid: int, req: UpdateSurveyRequest, _: dict = Depends(require_manager)):
+def update_survey(sid: int, req: UpdateSurveyRequest, _: dict = Depends(require_admin_or_manager)):
     """Cập nhật khảo sát. [MANAGER, ADMIN]"""
     data = req.model_dump(
         mode="json",
@@ -79,26 +82,26 @@ def update_survey(sid: int, req: UpdateSurveyRequest, _: dict = Depends(require_
 
 
 @router.delete("/surveys/{sid}", response_model=MessageResponse)
-def delete_survey_endpoint(sid: int, _: dict = Depends(require_manager)):
+def delete_survey_endpoint(sid: int, _: dict = Depends(require_admin_or_manager)):
     """Xóa khảo sát. [MANAGER, ADMIN]"""
     delete_survey(sid)
     return {"message": "Xóa khảo sát thành công"}
 
 
 @router.post("/surveys/{sid}/publish", response_model=SurveyResponse)
-def publish_survey(sid: int, _: dict = Depends(require_manager)):
+def publish_survey(sid: int, _: dict = Depends(require_admin_or_manager)):
     """Phát hành khảo sát. [MANAGER, ADMIN]"""
     return update_survey_status(sid, SurveyStatus.PUBLISHED.value)
 
 
 @router.post("/surveys/{sid}/close", response_model=SurveyResponse)
-def close_survey(sid: int, _: dict = Depends(require_manager)):
+def close_survey(sid: int, _: dict = Depends(require_admin_or_manager)):
     """Đóng khảo sát. [MANAGER, ADMIN]"""
     return update_survey_status(sid, SurveyStatus.CLOSED.value)
 
 
 @router.post("/surveys/{sid}/duplicate", response_model=SurveyResponse)
-def duplicate_survey(sid: int, current_user: dict = Depends(require_manager)):
+def duplicate_survey(sid: int, current_user: dict = Depends(require_admin_or_manager)):
     """Nhân bản khảo sát. [MANAGER, ADMIN]"""
     return survey_svc.duplicate_survey(sid, current_user["id"])
 
@@ -128,12 +131,27 @@ def check_my_response(sid: int, current_user: dict = Depends(get_current_user)):
 
 
 @router.get("/surveys/{sid}/responses", response_model=list[SurveyResponseItem])
-def list_responses(sid: int, _: dict = Depends(require_manager)):
+def list_responses(sid: int, _: dict = Depends(require_admin_or_manager)):
     """Danh sách tất cả phản hồi của một khảo sát. [MANAGER, ADMIN]"""
     return list_responses_by_survey(sid)
 
 
 @router.get("/responses/{rid}", response_model=SurveyResponseItem)
-def get_response(rid: int, _: dict = Depends(require_manager)):
+def get_response(rid: int, _: dict = Depends(require_admin_or_manager)):
     """Chi tiết một phản hồi. [MANAGER, ADMIN]"""
     return survey_svc.get_single_response(rid)
+
+
+@router.get("/surveys/{sid}/analysis")
+def get_surveys_analysis(
+    sid: int,
+    segment_type: Literal["OVERALL", "FACULTY", "SUBJECT"] = Query("OVERALL", description="OVERALL, FACULTY, or SUBJECT"),
+    segment_value: str = Query("ALL", description="ID của Khoa hoặc Môn học"),
+    _: dict = Depends(require_admin_or_manager)
+):
+    """
+    Lấy báo cáo phân tích kết quả khảo sát. 
+    Manager có thể lọc theo Khoa (segment_type=FACULTY, segment_value=1) 
+    hoặc Môn học để phục vụ việc giải trình.
+    """
+    return survey_svc.get_survey_analysis(sid, segment_type, segment_value)

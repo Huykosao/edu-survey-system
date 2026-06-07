@@ -58,7 +58,7 @@ export class ApiError extends Error {
 // Core fetch wrapper
 async function apiFetch<T = unknown>(
   endpoint: string,
-  options: RequestInit = {}
+  options: RequestInit = {},
 ): Promise<T> {
   const url = `${API_BASE_URL}${endpoint}`;
   const token = getAccessToken();
@@ -98,7 +98,7 @@ async function apiFetch<T = unknown>(
             throw new ApiError(
               errData?.detail || "Request failed",
               retryRes.status,
-              errData
+              errData,
             );
           }
           return retryRes.json();
@@ -123,7 +123,7 @@ async function apiFetch<T = unknown>(
     throw new ApiError(
       errData?.detail || `HTTP Error ${res.status}`,
       res.status,
-      errData
+      errData,
     );
   }
 
@@ -149,11 +149,9 @@ export const authApi = {
       body: JSON.stringify({ email, password }),
     }),
 
-  logout: () =>
-    apiFetch("/auth/logout", { method: "POST" }),
+  logout: () => apiFetch("/auth/logout", { method: "POST" }),
 
-  me: () =>
-    apiFetch<Record<string, unknown>>("/auth/me"),
+  me: () => apiFetch<Record<string, unknown>>("/auth/me"),
 
   changePassword: (currentPassword: string, newPassword: string) =>
     apiFetch("/auth/change-password", {
@@ -170,7 +168,7 @@ export const authApi = {
       {
         method: "POST",
         body: JSON.stringify({ refresh_token: refreshToken }),
-      }
+      },
     ),
 };
 
@@ -185,12 +183,11 @@ export const usersApi = {
     if (params?.page) query.set("page", params.page.toString());
     const qs = query.toString();
     return apiFetch<{ data: Record<string, unknown>[]; total: number }>(
-      `/api/users${qs ? `?${qs}` : ""}`
+      `/api/users${qs ? `?${qs}` : ""}`,
     );
   },
 
-  get: (id: number) =>
-    apiFetch<Record<string, unknown>>(`/api/users/${id}`),
+  get: (id: number) => apiFetch<Record<string, unknown>>(`/api/users/${id}`),
 
   create: (data: {
     email: string;
@@ -209,8 +206,7 @@ export const usersApi = {
       body: JSON.stringify(data),
     }),
 
-  delete: (id: number) =>
-    apiFetch(`/api/users/${id}`, { method: "DELETE" }),
+  delete: (id: number) => apiFetch(`/api/users/${id}`, { method: "DELETE" }),
 
   updateStatus: (id: number, status: string) =>
     apiFetch(`/api/users/${id}/status`, {
@@ -227,8 +223,7 @@ export const usersApi = {
       body: JSON.stringify({ role_ids: roleIds }),
     }),
 
-  listLogs: () =>
-    apiFetch<Record<string, unknown>[]>("/api/system-logs"),
+  listLogs: () => apiFetch<Record<string, unknown>[]>("/api/system-logs"),
 };
 
 // =============================================================
@@ -265,7 +260,10 @@ export const facultiesApi = {
   create: (data: { name: string }) =>
     apiFetch("/api/faculties", { method: "POST", body: JSON.stringify(data) }),
   update: (id: number, data: { name: string }) =>
-    apiFetch(`/api/faculties/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+    apiFetch(`/api/faculties/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
   delete: (id: number) =>
     apiFetch(`/api/faculties/${id}`, { method: "DELETE" }),
 };
@@ -275,9 +273,11 @@ export const majorsApi = {
   create: (data: { name: string; faculty_id: number }) =>
     apiFetch("/api/majors", { method: "POST", body: JSON.stringify(data) }),
   update: (id: number, data: Record<string, unknown>) =>
-    apiFetch(`/api/majors/${id}`, { method: "PUT", body: JSON.stringify(data) }),
-  delete: (id: number) =>
-    apiFetch(`/api/majors/${id}`, { method: "DELETE" }),
+    apiFetch(`/api/majors/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+  delete: (id: number) => apiFetch(`/api/majors/${id}`, { method: "DELETE" }),
 };
 
 export const classesApi = {
@@ -285,9 +285,11 @@ export const classesApi = {
   create: (data: { name: string; major_id: number }) =>
     apiFetch("/api/classes", { method: "POST", body: JSON.stringify(data) }),
   update: (id: number, data: Record<string, unknown>) =>
-    apiFetch(`/api/classes/${id}`, { method: "PUT", body: JSON.stringify(data) }),
-  delete: (id: number) =>
-    apiFetch(`/api/classes/${id}`, { method: "DELETE" }),
+    apiFetch(`/api/classes/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+  delete: (id: number) => apiFetch(`/api/classes/${id}`, { method: "DELETE" }),
 };
 
 export const subjectsApi = {
@@ -295,9 +297,11 @@ export const subjectsApi = {
   create: (data: { code: string; name: string; faculty_id: number }) =>
     apiFetch("/api/subjects", { method: "POST", body: JSON.stringify(data) }),
   update: (id: number, data: Record<string, unknown>) =>
-    apiFetch(`/api/subjects/${id}`, { method: "PUT", body: JSON.stringify(data) }),
-  delete: (id: number) =>
-    apiFetch(`/api/subjects/${id}`, { method: "DELETE" }),
+    apiFetch(`/api/subjects/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+  delete: (id: number) => apiFetch(`/api/subjects/${id}`, { method: "DELETE" }),
 };
 
 // =============================================================
@@ -309,7 +313,10 @@ export const profileApi = {
     apiFetch("/api/profile", { method: "PUT", body: JSON.stringify(data) }),
   getDetails: () => apiFetch<Record<string, unknown>>("/api/profile/details"),
   updateDetails: (data: Record<string, unknown>) =>
-    apiFetch("/api/profile/details", { method: "PUT", body: JSON.stringify(data) }),
+    apiFetch("/api/profile/details", {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
 };
 
 // =============================================================
@@ -322,24 +329,37 @@ export const surveysApi = {
     if (params?.page) query.set("page", params.page.toString());
     const qs = query.toString();
     return apiFetch<{ data: Record<string, unknown>[]; total: number }>(
-      `/api/surveys${qs ? `?${qs}` : ""}`
+      `/api/surveys${qs ? `?${qs}` : ""}`,
     );
   },
   get: (id: number) => apiFetch<Record<string, unknown>>(`/api/surveys/${id}`),
   create: (data: Record<string, unknown>) =>
     apiFetch("/api/surveys", { method: "POST", body: JSON.stringify(data) }),
   update: (id: number, data: Record<string, unknown>) =>
-    apiFetch(`/api/surveys/${id}`, { method: "PUT", body: JSON.stringify(data) }),
-  delete: (id: number) =>
-    apiFetch(`/api/surveys/${id}`, { method: "DELETE" }),
+    apiFetch(`/api/surveys/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+  delete: (id: number) => apiFetch(`/api/surveys/${id}`, { method: "DELETE" }),
   publish: (id: number) =>
     apiFetch(`/api/surveys/${id}/publish`, { method: "POST" }),
   close: (id: number) =>
     apiFetch(`/api/surveys/${id}/close`, { method: "POST" }),
   duplicate: (id: number) =>
     apiFetch(`/api/surveys/${id}/duplicate`, { method: "POST" }),
-  mySurveys: () =>
-    apiFetch<Record<string, unknown>[]>("/api/my-surveys"),
+  mySurveys: () => apiFetch<Record<string, unknown>[]>("/api/my-surveys"),
+  getAnalysis: (
+    id: number,
+    params?: { segment_type?: string; segment_value?: string },
+  ) => {
+    const query = new URLSearchParams();
+    if (params?.segment_type) query.set("segment_type", params.segment_type);
+    if (params?.segment_value) query.set("segment_value", params.segment_value);
+    const qs = query.toString();
+    return apiFetch<Record<string, unknown>>(
+      `/api/surveys/${id}/analysis${qs ? `?${qs}` : ""}`,
+    );
+  },
 };
 
 // =============================================================
@@ -352,7 +372,9 @@ export const responsesApi = {
       body: JSON.stringify(data),
     }),
   myResponse: (surveyId: number) =>
-    apiFetch<Record<string, unknown> | null>(`/api/surveys/${surveyId}/my-response`),
+    apiFetch<Record<string, unknown> | null>(
+      `/api/surveys/${surveyId}/my-response`,
+    ),
   list: (surveyId: number) =>
     apiFetch<Record<string, unknown>[]>(`/api/surveys/${surveyId}/responses`),
   get: (id: number) =>
@@ -364,9 +386,12 @@ export const responsesApi = {
 // =============================================================
 export const dashboardApi = {
   overview: () => apiFetch<Record<string, unknown>>("/api/dashboard/overview"),
-  faculties: () => apiFetch<Record<string, unknown>[]>("/api/dashboard/faculties"),
-  subjects: () => apiFetch<Record<string, unknown>[]>("/api/dashboard/subjects"),
-  survey: (id: number) => apiFetch<Record<string, unknown>>(`/api/dashboard/surveys/${id}`),
+  faculties: () =>
+    apiFetch<Record<string, unknown>[]>("/api/dashboard/faculties"),
+  subjects: () =>
+    apiFetch<Record<string, unknown>[]>("/api/dashboard/subjects"),
+  survey: (id: number) =>
+    apiFetch<Record<string, unknown>>(`/api/dashboard/surveys/${id}`),
 };
 
 // =============================================================
@@ -374,7 +399,8 @@ export const dashboardApi = {
 // =============================================================
 export const notificationsApi = {
   list: () => apiFetch<Record<string, unknown>[]>("/api/notifications"),
-  unread: () => apiFetch<Record<string, unknown>[]>("/api/notifications/unread"),
+  unread: () =>
+    apiFetch<Record<string, unknown>[]>("/api/notifications/unread"),
   markRead: (id: number) =>
     apiFetch(`/api/notifications/${id}/read`, { method: "PATCH" }),
   markAllRead: () =>
@@ -385,14 +411,18 @@ export const notificationsApi = {
 // Clarification Workflow API
 // =============================================================
 export const clarificationsApi = {
-  request: (data: { survey_id: number; lecturer_id: number; request_reason: string; deadline?: string }) =>
+  request: (data: {
+    survey_id: number;
+    lecturer_id: number;
+    request_reason: string;
+    deadline?: string;
+  }) =>
     apiFetch("/api/clarifications", {
       method: "POST",
       body: JSON.stringify(data),
     }),
 
-  listAll: () =>
-    apiFetch<Record<string, unknown>[]>("/api/clarifications"),
+  listAll: () => apiFetch<Record<string, unknown>[]>("/api/clarifications"),
 
   listPendingApprovals: () =>
     apiFetch<Record<string, unknown>[]>("/api/responses-to-students/pending"),
@@ -400,7 +430,10 @@ export const clarificationsApi = {
   listTasks: () =>
     apiFetch<Record<string, unknown>[]>("/api/clarifications/my-tasks"),
 
-  submit: (id: number, data: { explanation_content: string; commitment_text?: string }) =>
+  submit: (
+    id: number,
+    data: { explanation_content: string; commitment_text?: string },
+  ) =>
     apiFetch(`/api/clarifications/${id}/submit`, {
       method: "POST",
       body: JSON.stringify(data),
@@ -435,16 +468,19 @@ export const clarificationsApi = {
 // Improvement Announcement API
 // =============================================================
 export const improvementsApi = {
-  create: (data: { survey_id?: number; title: string; content: string; target_roles?: string[] }) =>
+  create: (data: {
+    survey_id?: number;
+    title: string;
+    content: string;
+    target_roles?: string[];
+  }) =>
     apiFetch("/api/improvements", {
       method: "POST",
       body: JSON.stringify(data),
     }),
 
-  list: () =>
-    apiFetch<Record<string, unknown>[]>("/api/improvements"),
+  list: () => apiFetch<Record<string, unknown>[]>("/api/improvements"),
 
   get: (id: number) =>
     apiFetch<Record<string, unknown>>(`/api/improvements/${id}`),
 };
-

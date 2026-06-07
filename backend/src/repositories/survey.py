@@ -91,3 +91,91 @@ def get_response_by_id(response_id: int) -> dict | None:
         .execute()
     )
     return result.data[0] if result.data else None
+
+def get_survey_stat(
+    survey_id: int,
+    segment_type: str = "OVERALL",
+    segment_value: str = "ALL"
+) -> dict | None:
+
+    result = (
+        supabase_client
+        .table("survey_stats")
+        .select("*")
+        .eq("survey_id", survey_id)
+        .eq("segment_type", segment_type)
+        .eq("segment_value", segment_value)
+        .limit(1)
+        .execute()
+    )
+
+    return result.data[0] if result.data else None
+
+def create_survey_stat(data: dict) -> dict:
+
+    result = (
+        supabase_client
+        .table("survey_stats")
+        .upsert(data)
+        .execute()
+    )
+
+    if not result.data:
+        raise HTTPException(
+            status_code=500,
+            detail="Không tạo hoặc cập nhật được survey_stats"
+        )
+
+    return result.data[0]
+
+def update_survey_stat(
+    stat_id: int,
+    update_data: dict
+) -> dict:
+
+    result = (
+        supabase_client
+        .table("survey_stats")
+        .update(update_data)
+        .eq("id", stat_id)
+        .execute()
+    )
+
+    if not result.data:
+        raise HTTPException(
+            status_code=404,
+            detail="Không tìm thấy survey_stats"
+        )
+
+    return result.data[0]
+
+def list_responses_with_filters(survey_id: int, segment_type: str = "OVERALL", segment_value: str = "ALL") -> list[dict]:
+    # Base query
+    query = supabase_client.table("survey_responses").select("*, users!inner(id, profile_details(*))").eq("survey_id", survey_id)
+    
+    # Lọc theo Môn học
+    # Lọc theo Môn học
+    if segment_type == "SUBJECT" and segment_value != "ALL":
+        try:
+            query = query.eq("subject_id", int(segment_value))
+        except ValueError:
+            raise HTTPException(status_code=400, detail="ID môn học không hợp lệ")
+    
+    # Lọc theo Khoa (thông qua bảng profile_details của user)
+    elif segment_type == "FACULTY" and segment_value != "ALL":
+        try:
+            query = query.eq("users.profile_details.faculty_id", int(segment_value))
+        except ValueError:
+            raise HTTPException(status_code=400, detail="ID khoa không hợp lệ")
+    
+    result = query.execute()
+    return result.data or []
+
+def delete_survey_stats(survey_id: int, segment_type: str = None, segment_value: str = None) -> None:
+    """Xóa thống kê để ép buộc tính toán lại (Cache Invalidation)."""
+    query = supabase_client.table("survey_stats").delete().eq("survey_id", survey_id)
+    if segment_type:
+        query = query.eq("segment_type", segment_type)
+    if segment_value:
+        query = query.eq("segment_value", segment_value)
+    query.execute()
