@@ -271,7 +271,7 @@ export default function ReportsPage() {
 
     let totalLikertScore = 0;
     let likertCount = 0;
-    let npsScore = 0;
+    let npsScore: number | null = null;
     let totalCompleted = analysis.total_responses || 0;
 
     Object.values(analysis.analysis).forEach((q: any) => {
