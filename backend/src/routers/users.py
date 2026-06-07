@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, Query
 from typing import Optional
 
 from src.core.security import get_current_user
-from src.core.middleware import require_admin, require_manager
+from src.core.middleware import require_admin, require_admin_or_manager
 from src.models.user import (
     CreateUserRequest,
     BulkCreateUserRequest,
@@ -51,14 +51,14 @@ def list_users(
     status: Optional[str] = Query(None),
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=100),
-    _: dict = Depends(require_manager),
+    _: dict = Depends(require_admin_or_manager),
 ):
     """Danh sách users có filter và phân trang. [MANAGER, ADMIN]"""
     return get_users_list(role, status, page, limit)
 
 
 @router.get("/users/{user_id}", response_model=UserPublicResponse)
-def get_user(user_id: int, _: dict = Depends(require_manager)):
+def get_user(user_id: int, _: dict = Depends(require_admin_or_manager)):
     """Chi tiết một user. [MANAGER, ADMIN]"""
     return get_single_user(user_id)
 

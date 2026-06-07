@@ -4,7 +4,7 @@ routers/improvements.py  (v2 — typed request/response models)
 
 from fastapi import APIRouter, Depends, HTTPException
 from src.core.security import get_current_user
-from src.core.middleware import require_manager
+from src.core.middleware import require_admin_or_manager
 from src.models.notification import (
     CreateImprovementRequest,
     ImprovementResponse,
@@ -26,7 +26,7 @@ router = APIRouter(
 @router.post("/improvements", response_model=ImprovementResponse)
 def create_improvement_announcement(
     req: CreateImprovementRequest,
-    current_user: dict = Depends(require_manager),
+    current_user: dict = Depends(require_admin_or_manager),
 ):
     """Tạo thông báo cải tiến. [MANAGER, ADMIN]"""
     return create_improvement({

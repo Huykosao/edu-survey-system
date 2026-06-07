@@ -8,7 +8,7 @@ Bao gồm validation cấu trúc content (SurveyContent) và answers khi submit.
 from fastapi import HTTPException
 from src.repositories import survey as survey_repo
 from src.schemas.survey import SurveyContent, QuestionType
-
+from collections import Counter
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -218,3 +218,151 @@ def get_single_response(response_id: int) -> dict:
     if not resp:
         raise HTTPException(status_code=404, detail="Không tìm thấy phản hồi")
     return resp
+
+def get_survey_analysis(survey_id: int, segment_type: str = "OVERALL", segment_value: str = "ALL") -> dict:
+    """
+    Lấy phân tích chi tiết kèm theo thông tin câu hỏi gốc.
+    """
+    # 1. Lấy thông tin khảo sát gốc để lấy tiêu đề câu hỏi
+    survey = survey_repo.get_survey_by_id(survey_id)
+    if not survey:
+        raise HTTPException(status_code=404, detail="Không tìm thấy khảo sát")
+    
+    content = _parse_content(survey["content"])
+    questions_metadata = {q.id: q for q in content.all_questions()}
+
+    # 2. Lấy dữ liệu thống kê (từ cache stats hoặc tính mới)
+    existing_stat = survey_repo.get_survey_stat(survey_id, segment_type, segment_value)
+    
+    if existing_stat:
+        stats_data = existing_stat["question_analysis"]
+        total_responses = existing_stat["total_responses"]
+    else:
+        # Tính toán mới nếu chưa có cache
+        responses = survey_repo.list_responses_with_filters(survey_id, segment_type, segment_value)
+        total_responses = len(responses)
+        stats_data = _calculate_metrics(content, responses)
+        
+        # Lưu cache
+        survey_repo.create_survey_stat({
+            "survey_id": survey_id,
+            "segment_type": segment_type,
+            "segment_value": segment_value,
+            "total_responses": total_responses,
+            "question_analysis": stats_data
+        })
+
+    # 3. TRỘN DỮ LIỆU: Thống kê + Câu hỏi gốc
+    enriched_analysis = {}
+    for q_id, q_meta in questions_metadata.items():
+        q_stats = stats_data.get(q_id, {})
+        
+        enriched_analysis[q_id] = {
+            "question_label": q_meta.label,      # Nội dung câu hỏi: "Bạn thấy thế nào..."
+            "question_type": q_meta.type,        # likert, nps...
+            "required": q_meta.required,
+            "stats": q_stats,                    # Dữ liệu số (distribution, average...)
+        }
+        
+        # Bổ sung thông tin metadata riêng cho từng loại để Frontend vẽ biểu đồ
+        if q_meta.type in [QuestionType.SINGLE_CHOICE, QuestionType.MULTIPLE_CHOICE]:
+            enriched_analysis[q_id]["options"] = q_meta.options
+            
+        elif q_meta.type == QuestionType.MATRIX:
+            enriched_analysis[q_id]["rows"] = q_meta.rows
+            enriched_analysis[q_id]["columns"] = q_meta.columns
+
+    return {
+        "survey_id": survey_id,
+        "survey_title": survey["title"],
+        "total_responses": total_responses,
+        "segment": {"type": segment_type, "value": segment_value},
+        "analysis": enriched_analysis
+    }
+
+
+def _calculate_metrics(content: SurveyContent, responses: list[dict]) -> dict:
+    """Xử lý từng câu hỏi theo định dạng yêu cầu."""
+    report = {}
+    all_questions = content.all_questions()
+    total_resps = len(responses)
+
+    for q in all_questions:
+        q_id = q.id
+        # Lấy danh sách câu trả lời cho câu hỏi này
+        ans_list = [r["answers"].get(q_id) for r in responses if r["answers"].get(q_id) is not None]
+        
+        count = len(ans_list)
+        if count == 0:
+            report[q_id] = {"type": q.type, "total": 0, "data": {}}
+            continue
+
+        # --- PHÂN TÍCH THEO LOẠI ---
+        
+        if q.type == QuestionType.LIKERT:
+            dist = dict(Counter(ans_list))
+            # Format: { "1": 10, "2": 20... }
+            score_dist = {str(i): dist.get(i, 0) for i in range(1, 6)}
+            avg = sum(ans_list) / count
+            report[q_id] = {
+                "type": "likert",
+                "total": count,
+                "average": round(avg, 2),
+                "score_distribution": score_dist
+            }
+
+        elif q.type == QuestionType.NPS:
+            promoters = [a for a in ans_list if a >= 9]
+            detractors = [a for a in ans_list if a <= 6]
+            nps_score = ((len(promoters) - len(detractors)) / count) * 100
+            report[q_id] = {
+                "type": "nps",
+                "total": count,
+                "score": round(nps_score, 2),
+                "distribution": {
+                    "promoters": len(promoters),
+                    "passives": count - len(promoters) - len(detractors),
+                    "detractors": len(detractors)
+                }
+            }
+
+        elif q.type == QuestionType.SINGLE_CHOICE:
+            dist = dict(Counter(ans_list))
+            report[q_id] = {
+                "type": "single_choice",
+                "total": count,
+                "distribution": {opt: dist.get(opt, 0) for opt in q.options}
+            }
+
+        elif q.type == QuestionType.MULTIPLE_CHOICE:
+            # ans_list: [["A", "B"], ["A"]] -> flat_list: ["A", "B", "A"]
+            flat_list = [item for sublist in ans_list for item in sublist]
+            dist = dict(Counter(flat_list))
+            report[q_id] = {
+                "type": "multiple_choice",
+                "total_respondents": count,
+                "distribution": {opt: dist.get(opt, 0) for opt in q.options}
+            }
+
+        elif q.type == QuestionType.MATRIX:
+            matrix_dist = {}
+            for row in q.rows:
+                # Lấy câu trả lời của từng hàng trong matrix
+                row_ans = [a.get(row) for a in ans_list if isinstance(a, dict) and a.get(row)]
+                row_counts = dict(Counter(row_ans))
+                matrix_dist[row] = {col: row_counts.get(col, 0) for col in q.columns}
+            
+            report[q_id] = {
+                "type": "matrix",
+                "total": count,
+                "rows_data": matrix_dist
+            }
+
+        elif q.type == QuestionType.OPEN_ENDED:
+            report[q_id] = {
+                "type": "open_ended",
+                "total": count,
+                "latest_samples": ans_list[-5:] # Trả về 5 câu trả lời gần nhất
+            }
+
+    return report

@@ -17,7 +17,7 @@ def require_admin(current_user: dict = Depends(get_current_user)) -> dict:
     return current_user
 
 
-def require_manager(current_user: dict = Depends(get_current_user)) -> dict:
+def require_admin_or_manager(current_user: dict = Depends(get_current_user)) -> dict:
     """Cho phép MANAGER hoặc ADMIN."""
     roles = current_user.get("roles", [])
     if "MANAGER" not in roles and "ADMIN" not in roles:
@@ -30,4 +30,11 @@ def require_lecturer(current_user: dict = Depends(get_current_user)) -> dict:
     roles = current_user.get("roles", [])
     if "LECTURER" not in roles:
         raise HTTPException(status_code=403, detail="Yêu cầu quyền Giảng viên")
+    return current_user
+
+def require_manager(current_user: dict = Depends(get_current_user)) -> dict:
+    """Alows only manager"""
+    roles = current_user.get("roles", [])
+    if "MANAGER" not in roles:
+        raise HTTPException(status_code=403, detail="Yêu cầu quyền Quản lý")
     return current_user
