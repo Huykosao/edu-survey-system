@@ -163,3 +163,12 @@ def list_responses_with_filters(survey_id: int, segment_type: str = "OVERALL", s
     
     result = query.execute()
     return result.data or []
+
+def delete_survey_stats(survey_id: int, segment_type: str = None, segment_value: str = None) -> None:
+    """Xóa thống kê để ép buộc tính toán lại (Cache Invalidation)."""
+    query = supabase_client.table("survey_stats").delete().eq("survey_id", survey_id)
+    if segment_type:
+        query = query.eq("segment_type", segment_type)
+    if segment_value:
+        query = query.eq("segment_value", segment_value)
+    query.execute()
