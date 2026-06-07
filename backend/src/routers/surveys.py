@@ -145,7 +145,7 @@ def get_response(rid: int, _: dict = Depends(require_admin_or_manager)):
 @router.get("/surveys/{sid}/analysis")
 def get_surveys_analysis(
     sid: int,
-    segment_type: str = Query("OVERALL", description="OVERALL, FACULTY, or SUBJECT"),
+    segment_type: Literal["OVERALL", "FACULTY", "SUBJECT"] = Query("OVERALL", description="OVERALL, FACULTY, or SUBJECT"),
     segment_value: str = Query("ALL", description="ID của Khoa hoặc Môn học"),
     _: dict = Depends(require_admin_or_manager)
 ):
