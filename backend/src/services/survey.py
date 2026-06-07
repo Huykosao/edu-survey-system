@@ -189,28 +189,128 @@ def submit_survey_response(survey_id: int, data: dict, user_id: int) -> dict:
         raise HTTPException(status_code=404, detail="Không tìm thấy bài khảo sát")
 
     answers = data.get("answers", {})
+    subject_id = data.get("subject_id")
 
-    # Validate answers theo schema câu hỏi trong survey
+    # 1. Validate answers
     if survey.get("content"):
         content = _parse_content(survey["content"])
         _validate_answers(answers, content)
-        # Tự động tổng hợp raw_content_text từ open_ended nếu chưa được gửi lên
         raw_text = data.get("raw_content_text", "") or _collect_open_ended_text(answers, content)
     else:
+        content = None
         raw_text = data.get("raw_content_text", "")
 
+    # 2. Check anonymous/duplicate
     is_anon = survey.get("is_anonymous", True)
     if not is_anon:
         if survey_repo.get_my_response(survey_id, user_id):
             raise HTTPException(status_code=400, detail="Bạn đã gửi phản hồi cho khảo sát này rồi.")
+
+    # 3. Save response
     resp_data = {
         "survey_id": survey_id,
         "user_id": None if is_anon else user_id,
-        "subject_id": data.get("subject_id"),
+        "subject_id": subject_id,
         "answers": answers,
         "raw_content_text": raw_text,
     }
-    return survey_repo.create_response(resp_data)
+    new_response = survey_repo.create_response(resp_data)
+
+    # 4. LOGIC MỚI: Tự động cập nhật thống kê (OVERALL và SUBJECT)
+    if content:
+        # Cập nhật tổng thể
+        _update_survey_stats_incremental(survey_id, "OVERALL", "ALL", answers, content)
+        
+        # Cập nhật theo môn học nếu có
+        if subject_id:
+            _update_survey_stats_incremental(survey_id, "SUBJECT", str(subject_id), answers, content)
+
+    return new_response
+
+def _update_survey_stats_incremental(survey_id: int, segment_type: str, segment_value: str, new_answers: dict, content: SurveyContent):
+    """Cập nhật thống kê mà không cần query lại toàn bộ responses."""
+    
+    # 1. Lấy thống kê hiện tại
+    stat_record = survey_repo.get_survey_stat(survey_id, segment_type, segment_value)
+    
+    if not stat_record:
+        # Nếu chưa có bản ghi stats, tính toán lần đầu từ chính câu trả lời này
+        # (Hoặc có thể gọi _calculate_metrics với list 1 phần tử)
+        analysis = _calculate_metrics(content, [{"answers": new_answers}])
+        survey_repo.create_survey_stat({
+            "survey_id": survey_id,
+            "segment_type": segment_type,
+            "segment_value": segment_value,
+            "total_responses": 1,
+            "question_analysis": analysis
+        })
+        return
+
+    # 2. Cập nhật dữ liệu
+    total = stat_record["total_responses"]
+    new_total = total + 1
+    analysis = stat_record["question_analysis"]
+    
+    for q in content.all_questions():
+        q_id = q.id
+        val = new_answers.get(q_id)
+        if val is None: continue
+
+        q_stat = analysis.get(q_id, {"type": q.type, "total": 0})
+        
+        if q.type == QuestionType.LIKERT:
+            # Avg mới = ((Avg cũ * Total cũ) + Value mới) / Total mới
+            old_avg = q_stat.get("average", 0)
+            old_count = q_stat.get("total", 0)
+            new_avg = round(((old_avg * old_count) + val) / (old_count + 1), 2)
+            
+            dist = q_stat.get("score_distribution", {str(i): 0 for i in range(1, 6)})
+            dist[str(val)] = dist.get(str(val), 0) + 1
+            
+            q_stat.update({"average": new_avg, "score_distribution": dist, "total": old_count + 1})
+
+        elif q.type == QuestionType.NPS:
+            dist = q_stat.get("distribution", {"promoters": 0, "passives": 0, "detractors": 0})
+            if val >= 9: dist["promoters"] += 1
+            elif val <= 6: dist["detractors"] += 1
+            else: dist["passives"] += 1
+            
+            q_count = q_stat.get("total", 0) + 1
+            new_score = round(((dist["promoters"] - dist["detractors"]) / q_count) * 100, 2)
+            
+            q_stat.update({"score": new_score, "distribution": dist, "total": q_count})
+
+        elif q.type in [QuestionType.SINGLE_CHOICE, QuestionType.MULTIPLE_CHOICE]:
+            dist = q_stat.get("distribution", {})
+            # Multiple choice val là list, single là str/int
+            vals = val if isinstance(val, list) else [val]
+            for v in vals:
+                dist[str(v)] = dist.get(str(v), 0) + 1
+            
+            q_stat.update({"distribution": dist, "total": q_stat.get("total", 0) + 1})
+
+        elif q.type == QuestionType.MATRIX:
+            rows_data = q_stat.get("rows_data", {})
+            for row, col_val in val.items():
+                if row not in rows_data: rows_data[row] = {}
+                rows_data[row][str(col_val)] = rows_data[row].get(str(col_val), 0) + 1
+            
+            q_stat.update({"rows_data": rows_data, "total": q_stat.get("total", 0) + 1})
+
+        elif q.type == QuestionType.OPEN_ENDED:
+            samples = q_stat.get("latest_samples", [])
+            if str(val).strip():
+                samples.append(str(val))
+                if len(samples) > 10: samples.pop(0) # Chỉ giữ 10 câu mới nhất
+            q_stat.update({"latest_samples": samples, "total": q_stat.get("total", 0) + 1})
+
+        analysis[q_id] = q_stat
+
+    # 3. Lưu lại vào DB
+    survey_repo.update_survey_stat(stat_record["id"], {
+        "total_responses": new_total,
+        "question_analysis": analysis
+    })
 
 
 def get_single_response(response_id: int) -> dict:
@@ -234,9 +334,22 @@ def get_survey_analysis(survey_id: int, segment_type: str = "OVERALL", segment_v
     # 2. Lấy dữ liệu thống kê (từ cache stats hoặc tính mới)
     existing_stat = survey_repo.get_survey_stat(survey_id, segment_type, segment_value)
     
+    # Trong get_survey_analysis...
     if existing_stat:
         stats_data = existing_stat["question_analysis"]
         total_responses = existing_stat["total_responses"]
+        # Vẫn phải làm bước map metadata để UI có Label/Options
+        enriched_analysis = {}
+        for q_id, q_meta in questions_metadata.items():
+            enriched_analysis[q_id] = {
+                "question_label": q_meta.label,
+                "question_type": q_meta.type,
+                "stats": stats_data.get(q_id, {}),
+                "options": getattr(q_meta, 'options', None),
+                "rows": getattr(q_meta, 'rows', None),
+                "columns": getattr(q_meta, 'columns', None),
+            }
+        return { "survey_title": survey["title"], "total_responses": total_responses, "analysis": enriched_analysis }
     else:
         # Tính toán mới nếu chưa có cache
         responses = survey_repo.list_responses_with_filters(survey_id, segment_type, segment_value)
