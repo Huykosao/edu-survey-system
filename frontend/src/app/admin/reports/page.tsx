@@ -56,7 +56,7 @@ const KPICard = ({ title, value, icon, color, subValue }: any) => (
 
 // --- 1. Biểu đồ Likert (Cột đứng) ---
 const LikertChart = ({ stats }: { stats: any }) => {
-  const chartData = Object.entries(stats.score_distribution || {}).map(
+  const chartData = Object.entries(stats?.score_distribution || {}).map(
     ([key, value]) => ({
       name: `${key}⭐`,
       value,
