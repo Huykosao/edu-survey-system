@@ -116,14 +116,14 @@ def create_survey_stat(data: dict) -> dict:
     result = (
         supabase_client
         .table("survey_stats")
-        .insert(data)
+        .upsert(data)
         .execute()
     )
 
     if not result.data:
         raise HTTPException(
             status_code=500,
-            detail="Không tạo được survey_stats"
+            detail="Không tạo hoặc cập nhật được survey_stats"
         )
 
     return result.data[0]
