@@ -3,7 +3,7 @@ routers/surveys.py  (v2 — typed request/response models)
 """
 
 from fastapi import APIRouter, Depends, Query
-from typing import Optional
+from typing import Optional, Literal
 
 from src.core.security import get_current_user
 from src.core.middleware import (
