@@ -12,11 +12,6 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   const redirectUser = (currentUser: any) => {
     const roles = currentUser?.roles || [];
@@ -74,7 +69,7 @@ export default function LoginPage() {
         <div className="absolute inset-0 bg-[radial-gradient(#ffffff10_1px,transparent_1px)] [background-size:28px_28px] opacity-30"></div>
 
         {/* Content */}
-        <div className={`relative z-20 px-16 max-w-[520px] text-on-primary flex flex-col gap-6 transition-all duration-700 ${mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}>
+        <div className="relative z-20 px-16 max-w-[520px] text-on-primary flex flex-col gap-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
           {/* Logo mark */}
           <div className="w-16 h-16 bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl flex items-center justify-center shadow-lg">
             <span className="material-symbols-outlined text-4xl text-white icon-fill">school</span>
@@ -129,7 +124,7 @@ export default function LoginPage() {
         {/* Subtle background texture for right side */}
         <div className="absolute top-0 right-0 w-[400px] h-[400px] rounded-full bg-primary/3 blur-[120px] pointer-events-none"></div>
 
-        <div className={`w-full max-w-[420px] flex flex-col relative z-10 transition-all duration-500 delay-200 ${mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}>
+        <div className="w-full max-w-[420px] flex flex-col relative z-10 animate-in fade-in slide-in-from-bottom-4 duration-500 delay-200 fill-mode-both">
           {/* Mobile logo */}
           <div className="lg:hidden flex flex-col items-center gap-3 mb-8">
             <div className="w-14 h-14 bg-primary text-on-primary rounded-2xl flex items-center justify-center shadow-lg">
@@ -192,7 +187,7 @@ export default function LoginPage() {
                   Mật khẩu
                 </label>
                 <a
-                  href="#"
+                  href="/forgot-password"
                   className="text-[12px] font-semibold text-primary hover:text-primary-container transition-colors"
                 >
                   Quên mật khẩu?

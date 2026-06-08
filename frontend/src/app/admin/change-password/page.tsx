@@ -4,6 +4,55 @@ import React, { useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { authApi, ApiError } from "@/lib/api";
 
+const PasswordField = ({
+  id,
+  label,
+  value,
+  onChange,
+  show,
+  onToggle,
+  placeholder,
+  setError,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  show: boolean;
+  onToggle: () => void;
+  placeholder: string;
+  setError: (v: string) => void;
+}) => (
+  <div className="flex flex-col gap-1.5">
+    <label className="text-[13px] font-semibold text-on-surface" htmlFor={id}>
+      {label}
+    </label>
+    <div className="relative group">
+      <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-outline group-focus-within:text-primary transition-colors">
+        <span className="material-symbols-outlined text-[20px]">lock</span>
+      </div>
+      <input
+        id={id}
+        type={show ? "text" : "password"}
+        value={value}
+        onChange={(e) => { onChange(e.target.value); setError(""); }}
+        placeholder={placeholder}
+        className="w-full h-[48px] pl-12 pr-12 rounded-xl border border-outline-variant bg-surface-container-lowest text-on-surface text-[14px] focus:border-primary focus:ring-2 focus:ring-primary/15 outline-none transition-all placeholder:text-outline/50"
+      />
+      <button
+        type="button"
+        onClick={onToggle}
+        className="absolute inset-y-0 right-0 pr-4 flex items-center text-outline hover:text-on-surface transition-colors cursor-pointer"
+        tabIndex={-1}
+      >
+        <span className="material-symbols-outlined text-[20px]">
+          {show ? "visibility_off" : "visibility"}
+        </span>
+      </button>
+    </div>
+  </div>
+);
+
 export default function ChangePasswordPage() {
   const { user } = useAuth();
   const [currentPassword, setCurrentPassword] = useState("");
@@ -41,6 +90,14 @@ export default function ChangePasswordPage() {
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
+      
+      // Auto logout immediately after password change
+      setTimeout(() => {
+        import("@/lib/api").then(({ clearTokens }) => {
+          clearTokens();
+          window.location.href = "/login";
+        });
+      }, 1500);
     } catch (err) {
       if (err instanceof ApiError) {
         setError(
@@ -55,53 +112,6 @@ export default function ChangePasswordPage() {
       setIsLoading(false);
     }
   };
-
-  const PasswordField = ({
-    id,
-    label,
-    value,
-    onChange,
-    show,
-    onToggle,
-    placeholder,
-  }: {
-    id: string;
-    label: string;
-    value: string;
-    onChange: (v: string) => void;
-    show: boolean;
-    onToggle: () => void;
-    placeholder: string;
-  }) => (
-    <div className="flex flex-col gap-1.5">
-      <label className="text-[13px] font-semibold text-on-surface" htmlFor={id}>
-        {label}
-      </label>
-      <div className="relative group">
-        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-outline group-focus-within:text-primary transition-colors">
-          <span className="material-symbols-outlined text-[20px]">lock</span>
-        </div>
-        <input
-          id={id}
-          type={show ? "text" : "password"}
-          value={value}
-          onChange={(e) => { onChange(e.target.value); setError(""); }}
-          placeholder={placeholder}
-          className="w-full h-[48px] pl-12 pr-12 rounded-xl border border-outline-variant bg-surface-container-lowest text-on-surface text-[14px] focus:border-primary focus:ring-2 focus:ring-primary/15 outline-none transition-all placeholder:text-outline/50"
-        />
-        <button
-          type="button"
-          onClick={onToggle}
-          className="absolute inset-y-0 right-0 pr-4 flex items-center text-outline hover:text-on-surface transition-colors cursor-pointer"
-          tabIndex={-1}
-        >
-          <span className="material-symbols-outlined text-[20px]">
-            {show ? "visibility_off" : "visibility"}
-          </span>
-        </button>
-      </div>
-    </div>
-  );
 
   return (
     <div className="flex flex-col gap-6 animate-in fade-in duration-300">
@@ -154,6 +164,7 @@ export default function ChangePasswordPage() {
             show={showCurrent}
             onToggle={() => setShowCurrent(!showCurrent)}
             placeholder="Nhập mật khẩu hiện tại"
+            setError={setError}
           />
           <PasswordField
             id="new-pw"
@@ -163,6 +174,7 @@ export default function ChangePasswordPage() {
             show={showNew}
             onToggle={() => setShowNew(!showNew)}
             placeholder="Tối thiểu 6 ký tự"
+            setError={setError}
           />
           <PasswordField
             id="confirm-pw"
@@ -172,6 +184,7 @@ export default function ChangePasswordPage() {
             show={showConfirm}
             onToggle={() => setShowConfirm(!showConfirm)}
             placeholder="Nhập lại mật khẩu mới"
+            setError={setError}
           />
 
           {/* Password strength hint */}

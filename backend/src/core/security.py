@@ -31,8 +31,20 @@ def create_access_token(user_id: int, email: str, roles: list[str]) -> str:
         "sub": str(user_id),
         "email": email,
         "roles": roles,
+        "type": "access",
         "exp": datetime.datetime.now(datetime.timezone.utc)
             + datetime.timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
+        "iat": datetime.datetime.now(datetime.timezone.utc),
+    }
+    return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+
+
+def create_refresh_token(user_id: int) -> str:
+    """Tạo JWT refresh token với hạn dài hơn."""
+    payload = {
+        "sub": str(user_id),
+        "type": "refresh",
+        "exp": datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=7),
         "iat": datetime.datetime.now(datetime.timezone.utc),
     }
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)

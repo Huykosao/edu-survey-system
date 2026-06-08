@@ -24,6 +24,7 @@ export default function UserManagementPage() {
   const [importStatus, setImportStatus] = useState<"idle" | "loading" | "success" | "error" | "partial">("idle");
   const [importMessage, setImportMessage] = useState("");
   const [importErrors, setImportErrors] = useState<string[]>([]);
+  const [importSelectedRole, setImportSelectedRole] = useState<"Sinh viên" | "Giảng viên" | "Quản lý" | "Quản trị viên" | "Cựu sinh viên" | "Nhà tuyển dụng">("Sinh viên");
   const [loading, setLoading] = useState(false);
   
   // Pagination & Dropdown states
@@ -152,18 +153,16 @@ export default function UserManagementPage() {
   const handleDownloadTemplate = () => {
     const ws = XLSX.utils.json_to_sheet([
       {
+        "Mật khẩu": "matkhau123",
         "Họ và tên": "Nguyễn Văn A",
         "Email": "nva@example.com",
-        "Mật khẩu": "matkhau123",
-        "Vai trò": "Sinh viên",
         "Số điện thoại": "0987654321",
         "Khoa": "Công nghệ thông tin"
       },
       {
+        "Mật khẩu": "matkhau456",
         "Họ và tên": "Trần Thị B",
         "Email": "ttb@example.com",
-        "Mật khẩu": "matkhau456",
-        "Vai trò": "Giảng viên",
         "Số điện thoại": "0912345678",
         "Khoa": "Kinh tế"
       }
@@ -210,7 +209,6 @@ export default function UserManagementPage() {
           const email = row["Email"]?.toString().trim() || "";
           const password = row["Mật khẩu"]?.toString() || "";
           let phone = row["Số điện thoại"]?.toString().trim() || "";
-          const roleName = row["Vai trò"]?.toString().trim() || "Sinh viên";
           let facultyName = row["Khoa"]?.toString().trim();
           if (!facultyName) facultyName = null;
 
@@ -220,21 +218,14 @@ export default function UserManagementPage() {
           }
 
           let roleIds = [4]; // STUDENT mặc định
-          const validRoles = ["Sinh viên", "Quản trị viên", "Quản lý", "Giảng viên", "Cựu sinh viên", "Nhà tuyển dụng"];
-          
-          if (!validRoles.includes(roleName)) {
-            frontendErrors.push(`Dòng ${rowNum}: Vai trò không hợp lệ (${roleName}). Hợp lệ: ${validRoles.join(", ")}`);
-          } else {
-            if (roleName === "Quản trị viên") roleIds = [1];
-            else if (roleName === "Quản lý") roleIds = [2];
-            else if (roleName === "Giảng viên") roleIds = [3];
-            else if (roleName === "Cựu sinh viên") roleIds = [5];
-            else if (roleName === "Nhà tuyển dụng") roleIds = [6];
-            else roleIds = [4]; // Sinh viên
-          }
+          if (importSelectedRole === "Quản trị viên") roleIds = [1];
+          else if (importSelectedRole === "Quản lý") roleIds = [2];
+          else if (importSelectedRole === "Giảng viên") roleIds = [3];
+          else if (importSelectedRole === "Cựu sinh viên") roleIds = [5];
+          else if (importSelectedRole === "Nhà tuyển dụng") roleIds = [6];
 
           if (!name || !email || !password) {
-            frontendErrors.push(`Dòng ${rowNum}: Thiếu thông tin bắt buộc (Họ tên, Email, Mật khẩu).`);
+            frontendErrors.push(`Dòng ${rowNum}: Thiếu thông tin bắt buộc (Mật khẩu, Họ tên, Email).`);
           } else {
             const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
             if (!emailRegex.test(email)) {
@@ -704,7 +695,7 @@ export default function UserManagementPage() {
                 
                 <div className="flex flex-col gap-sm">
                   <p className="text-body-md text-on-surface-variant">
-                    Vui lòng tải xuống file mẫu và điền dữ liệu theo đúng định dạng. Các cột yêu cầu: <b>Họ và tên</b>, <b>Email</b>, <b>Mật khẩu</b>, <b>Vai trò</b>, <b>Số điện thoại</b>, <b>Khoa</b>. Cột Vai trò chỉ chấp nhận: <i>Sinh viên, Giảng viên, Quản lý, Quản trị viên, Cựu sinh viên, Nhà tuyển dụng</i>.
+                    Vui lòng tải xuống file mẫu và điền dữ liệu theo đúng định dạng. Các cột yêu cầu: <b>Mật khẩu</b>, <b>Họ và tên</b>, <b>Email</b>, <b>Số điện thoại</b>, <b>Khoa</b>.
                   </p>
                   
                   <button 
@@ -714,6 +705,23 @@ export default function UserManagementPage() {
                     <span className="material-symbols-outlined text-[20px]">download</span>
                     Tải file Excel mẫu
                   </button>
+                </div>
+                
+                <div className="flex flex-col gap-xs mt-2">
+                  <label className="text-label-md font-semibold text-on-surface-variant" htmlFor="import-role">Vai trò cho danh sách import này</label>
+                  <select
+                    id="import-role"
+                    value={importSelectedRole}
+                    onChange={(e) => setImportSelectedRole(e.target.value as any)}
+                    className="w-full p-2.5 bg-surface-container-lowest border border-outline-variant rounded-lg font-body-md focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                  >
+                    <option>Sinh viên</option>
+                    <option>Giảng viên</option>
+                    <option>Quản lý</option>
+                    <option>Quản trị viên</option>
+                    <option>Cựu sinh viên</option>
+                    <option>Nhà tuyển dụng</option>
+                  </select>
                 </div>
 
                 <div className="mt-md border-2 border-dashed border-outline-variant rounded-xl p-xl flex flex-col items-center justify-center bg-surface-container-lowest relative overflow-hidden group">

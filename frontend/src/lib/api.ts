@@ -79,8 +79,10 @@ async function apiFetch<T = unknown>(
 
   // Handle 401 — try refresh token
   if (res.status === 401) {
+    const isLoginEndpoint = url.includes("/auth/login");
     const refreshToken = getRefreshToken();
-    if (refreshToken) {
+    
+    if (refreshToken && !isLoginEndpoint) {
       try {
         const refreshRes = await fetch(`${API_BASE_URL}/auth/refresh-token`, {
           method: "POST",
@@ -111,11 +113,20 @@ async function apiFetch<T = unknown>(
         }
       }
     }
-    clearTokens();
-    if (typeof window !== "undefined") {
-      window.location.href = "/login";
+    
+    if (!isLoginEndpoint) {
+      clearTokens();
+      if (typeof window !== "undefined") {
+        window.location.href = "/login";
+      }
     }
-    throw new ApiError("Unauthorized", 401);
+    
+    const errData = await res.json().catch(() => null);
+    throw new ApiError(
+      errData?.detail || "Unauthorized",
+      401,
+      errData
+    );
   }
 
   if (!res.ok) {
@@ -170,6 +181,11 @@ export const authApi = {
         body: JSON.stringify({ refresh_token: refreshToken }),
       },
     ),
+  forgotPassword: (email: string) =>
+    apiFetch<{ message: string }>("/auth/forgot-password", {
+      method: "POST",
+      body: JSON.stringify({ email }),
+    }),
 };
 
 // =============================================================
