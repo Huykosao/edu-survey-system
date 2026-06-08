@@ -66,37 +66,49 @@ def get_user(user_id: int, _: dict = Depends(require_admin_or_manager)):
 @router.post("/users", response_model=UserPublicResponse)
 def create_user(req: CreateUserRequest, current_user: dict = Depends(require_admin)):
     """Tạo user mới. [ADMIN]"""
+    from src.repositories.user import upsert_profile_details, delete_user
     new_user = create_user_service(req)
-    roles = []
-    if req.role_ids:
-        set_user_roles(new_user["id"], req.role_ids)
-        roles = get_user_roles(new_user["id"])
-        
-    profile_data = {}
-    if req.phone:
-        profile_data["metadata"] = {"phone": req.phone}
-    if req.faculty_id:
-        profile_data["faculty_id"] = req.faculty_id
-    if profile_data:
-        upsert_profile_details(new_user["id"], profile_data)
-        
-    from src.services.user import sanitize_user
-    return sanitize_user(new_user, roles)
+    user_id = new_user["id"]
+    try:
+        roles = []
+        if req.role_ids:
+            set_user_roles(user_id, req.role_ids)
+            roles = get_user_roles(user_id)
+            
+        profile_data = {}
+        if req.phone:
+            profile_data["metadata"] = {"phone": req.phone}
+        if req.faculty_id:
+            profile_data["faculty_id"] = req.faculty_id
+        if profile_data:
+            upsert_profile_details(user_id, profile_data)
+            
+        from src.services.user import sanitize_user
+        return sanitize_user(new_user, roles)
+    except Exception as e:
+        delete_user(user_id)
+        raise e
 
 
-@router.post("/users/bulk", response_model=MessageResponse)
+@router.post("/users/bulk")
 def bulk_create_users(req: BulkCreateUserRequest, _: dict = Depends(require_admin)):
     """Tạo nhiều user cùng lúc từ file Excel. [ADMIN]"""
     from src.services.auth import create_user_service
     from src.repositories.role import set_user_roles
     from src.core.database import supabase_client
+    from src.repositories.user import upsert_profile_details, delete_user
     
     fac_res = supabase_client.table("faculties").select("id, name").execute()
-    faculties_map = {f["name"].lower(): f["id"] for f in fac_res.data} if fac_res.data else {}
+    faculties_map = {}
+    if fac_res.data:
+        for f in fac_res.data:
+            if f.get("name"):
+                faculties_map[f["name"].strip().lower()] = f["id"]
     
     success_count = 0
     errors = []
     for idx, user_req in enumerate(req.users):
+        user_id = None
         try:
             new_user = create_user_service(user_req)
             user_id = new_user["id"]
@@ -113,12 +125,20 @@ def bulk_create_users(req: BulkCreateUserRequest, _: dict = Depends(require_admi
                 fname_lower = user_req.faculty_name.lower().strip()
                 if fname_lower in faculties_map:
                     profile_data["faculty_id"] = faculties_map[fname_lower]
+                else:
+                    raise ValueError(f"Khoa '{user_req.faculty_name}' không tồn tại trong hệ thống")
 
             if profile_data:
                 upsert_profile_details(user_id, profile_data)
                 
             success_count += 1
         except Exception as e:
+            if user_id is not None:
+                try:
+                    delete_user(user_id)
+                except Exception:
+                    pass # Ignore rollback errors to continue processing
+                    
             # Extract error message
             err_msg = str(e)
             if hasattr(e, "detail"):

@@ -180,8 +180,8 @@ export default function UserManagementPage() {
     const reader = new FileReader();
     reader.onload = async (evt) => {
       try {
-        const bstr = evt.target?.result;
-        const wb = XLSX.read(bstr, { type: "binary" });
+        const ab = evt.target?.result;
+        const wb = XLSX.read(ab, { type: "array" });
         const wsname = wb.SheetNames[0];
         const ws = wb.Sheets[wsname];
         const data: any[] = XLSX.utils.sheet_to_json(ws);
@@ -198,8 +198,13 @@ export default function UserManagementPage() {
           const name = row["Họ và tên"]?.toString().trim() || "";
           const email = row["Email"]?.toString().trim() || "";
           const password = row["Mật khẩu"]?.toString() || "";
-          const phone = row["Số điện thoại"]?.toString().trim() || "";
+          let phone = row["Số điện thoại"]?.toString().trim() || "";
           const roleName = row["Vai trò"]?.toString().trim() || "Sinh viên";
+
+          // Khôi phục số 0 đứng đầu nếu Excel tự động chuyển thành số và làm mất
+          if (phone && phone.length === 9 && /^[35789]/.test(phone)) {
+            phone = "0" + phone;
+          }
 
           if (!name || !email || !password) {
             frontendErrors.push(`Dòng ${rowNum}: Thiếu thông tin bắt buộc (Họ tên, Email, Mật khẩu).`);
@@ -271,7 +276,7 @@ export default function UserManagementPage() {
         if (e.target) e.target.value = ""; // Reset input
       }
     };
-    reader.readAsBinaryString(file);
+    reader.readAsArrayBuffer(file);
   };
 
   // Filter logic
