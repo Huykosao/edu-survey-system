@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { usersApi } from "@/lib/api";
+import { usersApi, facultiesApi } from "@/lib/api";
+import * as XLSX from "xlsx";
 
 interface User {
   id: string;
@@ -19,6 +20,10 @@ export default function UserManagementPage() {
   const [selectedRole, setSelectedRole] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importStatus, setImportStatus] = useState<"idle" | "loading" | "success" | "error" | "partial">("idle");
+  const [importMessage, setImportMessage] = useState("");
+  const [importErrors, setImportErrors] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   
   // Pagination & Dropdown states
@@ -34,7 +39,11 @@ export default function UserManagementPage() {
   const [newName, setNewName] = useState("");
   const [newEmail, setNewEmail] = useState("");
   const [newPassword, setNewPassword] = useState("");
+  const [newPhone, setNewPhone] = useState("");
+  const [newFacultyId, setNewFacultyId] = useState<number | "">("");
   const [newRole, setNewRole] = useState<"Sinh viên" | "Giảng viên" | "Quản lý" | "Quản trị viên" | "Cựu sinh viên" | "Nhà tuyển dụng">("Sinh viên");
+
+  const [faculties, setFaculties] = useState<{id: number; name: string}[]>([]);
 
   // Users Data
   const [users, setUsers] = useState<User[]>([]);
@@ -74,6 +83,7 @@ export default function UserManagementPage() {
 
   useEffect(() => {
     loadUsers();
+    facultiesApi.list().then((res: any) => setFaculties(res)).catch(() => {});
   }, []);
 
   const handleToggleLock = async (id: string) => {
@@ -122,17 +132,171 @@ export default function UserManagementPage() {
         full_name: newName,
         email: newEmail,
         password: newPassword,
-        role_ids: roleIds
+        role_ids: roleIds,
+        phone: newPhone || undefined,
+        faculty_id: newFacultyId ? Number(newFacultyId) : undefined,
       });
       setNewName("");
       setNewEmail("");
       setNewPassword("");
+      setNewPhone("");
+      setNewFacultyId("");
       setNewRole("Sinh viên");
       setShowAddModal(false);
       loadUsers();
     } catch (err) {
       console.error("Error creating user:", err);
     }
+  };
+
+  const handleDownloadTemplate = () => {
+    const ws = XLSX.utils.json_to_sheet([
+      {
+        "Họ và tên": "Nguyễn Văn A",
+        "Email": "nva@example.com",
+        "Mật khẩu": "matkhau123",
+        "Vai trò": "Sinh viên",
+        "Số điện thoại": "0987654321",
+        "Khoa": "Công nghệ thông tin"
+      },
+      {
+        "Họ và tên": "Trần Thị B",
+        "Email": "ttb@example.com",
+        "Mật khẩu": "matkhau456",
+        "Vai trò": "Giảng viên",
+        "Số điện thoại": "0912345678",
+        "Khoa": "Kinh tế"
+      }
+    ]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Users Template");
+    XLSX.writeFile(wb, "Mau_nhap_nguoi_dung.xlsx");
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        const ab = evt.target?.result;
+        if (!(ab instanceof ArrayBuffer)) {
+          alert("Lỗi đọc file: Không thể đọc dữ liệu nhị phân.");
+          return;
+        }
+        const wb = XLSX.read(ab, { type: "array" });
+        if (!wb.SheetNames || wb.SheetNames.length === 0) {
+          alert("File Excel không hợp lệ hoặc không có trang tính.");
+          return;
+        }
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const rawData: any[] = XLSX.utils.sheet_to_json(ws);
+
+        // Lọc các hàng trống hoàn toàn
+        const data = rawData.filter(row => Object.keys(row).some(key => row[key] !== undefined && row[key] !== null && row[key].toString().trim() !== ""));
+
+        if (data.length === 0) {
+          alert("File Excel trống hoặc không có dữ liệu hợp lệ!");
+          return;
+        }
+
+        const frontendErrors: string[] = [];
+
+        const usersToCreate = data.map((row: any, index: number) => {
+          const rowNum = index + 2; // +1 for header, +1 for 0-index
+          const name = row["Họ và tên"]?.toString().trim() || "";
+          const email = row["Email"]?.toString().trim() || "";
+          const password = row["Mật khẩu"]?.toString() || "";
+          let phone = row["Số điện thoại"]?.toString().trim() || "";
+          const roleName = row["Vai trò"]?.toString().trim() || "Sinh viên";
+          let facultyName = row["Khoa"]?.toString().trim();
+          if (!facultyName) facultyName = null;
+
+          // Khôi phục số 0 đứng đầu nếu Excel tự động chuyển thành số và làm mất
+          if (phone && phone.length === 9 && /^[35789]/.test(phone)) {
+            phone = "0" + phone;
+          }
+
+          let roleIds = [4]; // STUDENT mặc định
+          const validRoles = ["Sinh viên", "Quản trị viên", "Quản lý", "Giảng viên", "Cựu sinh viên", "Nhà tuyển dụng"];
+          
+          if (!validRoles.includes(roleName)) {
+            frontendErrors.push(`Dòng ${rowNum}: Vai trò không hợp lệ (${roleName}). Hợp lệ: ${validRoles.join(", ")}`);
+          } else {
+            if (roleName === "Quản trị viên") roleIds = [1];
+            else if (roleName === "Quản lý") roleIds = [2];
+            else if (roleName === "Giảng viên") roleIds = [3];
+            else if (roleName === "Cựu sinh viên") roleIds = [5];
+            else if (roleName === "Nhà tuyển dụng") roleIds = [6];
+            else roleIds = [4]; // Sinh viên
+          }
+
+          if (!name || !email || !password) {
+            frontendErrors.push(`Dòng ${rowNum}: Thiếu thông tin bắt buộc (Họ tên, Email, Mật khẩu).`);
+          } else {
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(email)) {
+              frontendErrors.push(`Dòng ${rowNum}: Email không hợp lệ (${email}).`);
+            }
+            if (phone && !/^(0|\+84)[35789][0-9]{8}$/.test(phone)) {
+              frontendErrors.push(`Dòng ${rowNum}: Số điện thoại không hợp lệ (${phone}).`);
+            }
+            if (password.length < 6) {
+              frontendErrors.push(`Dòng ${rowNum}: Mật khẩu phải có ít nhất 6 ký tự.`);
+            }
+          }
+
+          return {
+            full_name: name,
+            email: email,
+            password: password,
+            role_ids: roleIds,
+            phone: phone || null,
+            faculty_name: facultyName
+          };
+        }).filter(u => u.full_name && u.email && u.password);
+
+        if (frontendErrors.length > 0) {
+          setImportErrors(frontendErrors);
+          setImportStatus("error");
+          return;
+        }
+
+        if (usersToCreate.length === 0) {
+          alert("Không tìm thấy dữ liệu hợp lệ trong file Excel.");
+          return;
+        }
+
+        if (usersToCreate.length > 500) {
+          alert("Bạn chỉ được tải lên tối đa 500 người dùng một lần để đảm bảo hiệu năng hệ thống.");
+          return;
+        }
+
+        setImportStatus("loading");
+        const res: any = await usersApi.bulkCreate({ users: usersToCreate });
+        
+        if (res.errors && res.errors.length > 0) {
+          const backendErrors = res.errors.map((e: any) => `- ${e.email}: ${e.error}`);
+          setImportErrors(backendErrors);
+          setImportMessage(`Tạo thành công ${res.success_count}/${res.total_count} người dùng.`);
+          setImportStatus(res.success_count > 0 ? "partial" : "error");
+        } else {
+          setImportMessage(`Đã tạo thành công toàn bộ ${usersToCreate.length} người dùng!`);
+          setImportStatus("success");
+        }
+        
+        loadUsers();
+      } catch (error: any) {
+        console.error("Error parsing Excel file:", error);
+        setImportErrors([error?.message || "Có lỗi xảy ra trong quá trình xử lý file."]);
+        setImportStatus("error");
+      } finally {
+        if (e.target) e.target.value = ""; // Reset input
+      }
+    };
+    reader.readAsArrayBuffer(file);
   };
 
   // Filter logic
@@ -158,13 +322,22 @@ export default function UserManagementPage() {
             Quản lý quyền truy cập hệ thống, vai trò phân quyền và trạng thái tài khoản của người dùng.
           </p>
         </div>
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="bg-primary text-on-primary px-6 py-3 rounded-lg font-label-md text-label-md flex items-center gap-2 hover:bg-primary-container hover:text-on-primary-container transition-colors shadow-sm cursor-pointer self-start md:self-auto"
-        >
-          <span className="material-symbols-outlined text-[20px]">person_add</span>
-          Thêm người dùng mới
-        </button>
+        <div className="flex gap-sm self-start md:self-auto">
+          <button
+            onClick={() => setShowImportModal(true)}
+            className="bg-surface-variant text-on-surface-variant px-4 py-3 rounded-lg font-label-md text-label-md flex items-center gap-2 hover:bg-surface-container-high transition-colors shadow-sm cursor-pointer"
+          >
+            <span className="material-symbols-outlined text-[20px]">upload_file</span>
+            <span className="hidden sm:inline">Import Excel</span>
+          </button>
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="bg-primary text-on-primary px-4 py-3 rounded-lg font-label-md text-label-md flex items-center gap-2 hover:bg-primary-container hover:text-on-primary-container transition-colors shadow-sm cursor-pointer"
+          >
+            <span className="material-symbols-outlined text-[20px]">person_add</span>
+            <span className="hidden sm:inline">Thêm người dùng</span>
+          </button>
+        </div>
       </div>
 
       {/* Filters & Search Toolbar */}
@@ -229,12 +402,12 @@ export default function UserManagementPage() {
                 key={user.id}
                 className={`rounded-xl p-lg hover:shadow-[0_4px_12px_rgba(0,0,0,0.05)] transition-all duration-200 flex flex-col h-full relative bg-surface-container-lowest border ${
                   isLocked ? "border-error-container" : "border-outline-variant"
-                }`}
+                } ${openDropdown === user.id ? "z-50" : "z-0"}`}
               >
                 {/* Locked overlay effect */}
                 {isLocked && <div className="absolute inset-0 bg-surface-container-highest opacity-25 pointer-events-none z-0 rounded-xl"></div>}
 
-                <div className="flex justify-between items-start mb-md relative z-10">
+                <div className={`flex justify-between items-start mb-md relative ${openDropdown === user.id ? "z-30" : "z-10"}`}>
                   <div className="flex items-center gap-md">
                     <div
                       className={`w-12 h-12 rounded-full flex items-center justify-center font-headline-md font-bold text-lg border ${
@@ -257,43 +430,49 @@ export default function UserManagementPage() {
                   <div className="relative">
                     <button 
                       onClick={() => setOpenDropdown(openDropdown === user.id ? null : user.id)}
-                      className="text-on-surface-variant hover:text-primary transition-colors cursor-pointer p-1 rounded-full hover:bg-surface-container"
+                      className="text-on-surface-variant hover:text-primary transition-colors cursor-pointer p-1 rounded-full hover:bg-surface-container relative z-10"
                     >
                       <span className="material-symbols-outlined">more_vert</span>
                     </button>
                     {openDropdown === user.id && (
-                      <div className="absolute right-0 mt-1 w-48 bg-surface rounded-lg shadow-lg border border-outline-variant py-1 z-20">
-                        <button
-                          onClick={() => {
-                            setOpenDropdown(null);
-                            router.push(`/admin/users/edit?id=${user.id}`);
-                          }}
-                          className="w-full text-left px-4 py-2.5 text-label-md hover:bg-surface-container flex items-center gap-3 transition-colors cursor-pointer"
-                        >
-                          <span className="material-symbols-outlined text-[18px]">edit</span>
-                          Chỉnh sửa
-                        </button>
-                        <button 
-                          onClick={() => {
-                            setOpenDropdown(null);
-                            handleToggleLock(user.id);
-                          }}
-                          className="w-full text-left px-4 py-2.5 text-label-md hover:bg-surface-container flex items-center gap-3 transition-colors cursor-pointer"
-                        >
-                          <span className="material-symbols-outlined text-[18px]">{isLocked ? "lock_open" : "lock"}</span>
-                          {isLocked ? "Mở khóa" : "Khóa tài khoản"}
-                        </button>
-                        <button 
-                          onClick={() => {
-                            setOpenDropdown(null);
-                            handleDeleteUser(user.id);
-                          }}
-                          className="w-full text-left px-4 py-2.5 text-label-md text-error hover:bg-error-container/20 flex items-center gap-3 transition-colors cursor-pointer"
-                        >
-                          <span className="material-symbols-outlined text-[18px]">delete</span>
-                          Xóa người dùng
-                        </button>
-                      </div>
+                      <>
+                        <div 
+                          className="fixed inset-0 z-40" 
+                          onClick={() => setOpenDropdown(null)}
+                        ></div>
+                        <div className="absolute right-0 mt-1 w-48 bg-surface rounded-lg shadow-lg border border-outline-variant py-1 z-50">
+                          <button
+                            onClick={() => {
+                              setOpenDropdown(null);
+                              router.push(`/admin/users/edit?id=${user.id}`);
+                            }}
+                            className="w-full text-left px-4 py-2.5 text-label-md hover:bg-surface-container flex items-center gap-3 transition-colors cursor-pointer relative z-50"
+                          >
+                            <span className="material-symbols-outlined text-[18px]">edit</span>
+                            Chỉnh sửa
+                          </button>
+                          <button 
+                            onClick={() => {
+                              setOpenDropdown(null);
+                              handleToggleLock(user.id);
+                            }}
+                            className="w-full text-left px-4 py-2.5 text-label-md hover:bg-surface-container flex items-center gap-3 transition-colors cursor-pointer relative z-50"
+                          >
+                            <span className="material-symbols-outlined text-[18px]">{isLocked ? "lock_open" : "lock"}</span>
+                            {isLocked ? "Mở khóa" : "Khóa tài khoản"}
+                          </button>
+                          <button 
+                            onClick={() => {
+                              setOpenDropdown(null);
+                              handleDeleteUser(user.id);
+                            }}
+                            className="w-full text-left px-4 py-2.5 text-label-md text-error hover:bg-error-container/20 flex items-center gap-3 transition-colors cursor-pointer relative z-50"
+                          >
+                            <span className="material-symbols-outlined text-[18px]">delete</span>
+                            Xóa người dùng
+                          </button>
+                        </div>
+                      </>
                     )}
                   </div>
                 </div>
@@ -394,6 +573,31 @@ export default function UserManagementPage() {
                 />
               </div>
               <div className="flex flex-col gap-xs">
+                <label className="text-label-md font-semibold text-on-surface-variant" htmlFor="user-phone">Số điện thoại</label>
+                <input
+                  id="user-phone"
+                  type="text"
+                  placeholder="Nhập số điện thoại..."
+                  value={newPhone}
+                  onChange={(e) => setNewPhone(e.target.value)}
+                  className="w-full p-2.5 bg-surface-container-lowest border border-outline-variant rounded-lg font-body-md focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                />
+              </div>
+              <div className="flex flex-col gap-xs">
+                <label className="text-label-md font-semibold text-on-surface-variant" htmlFor="user-faculty">Khoa</label>
+                <select
+                  id="user-faculty"
+                  value={newFacultyId}
+                  onChange={(e) => setNewFacultyId(e.target.value === "" ? "" : Number(e.target.value))}
+                  className="w-full p-2.5 bg-surface-container-lowest border border-outline-variant rounded-lg font-body-md focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                >
+                  <option value="">-- Chọn Khoa (Không bắt buộc) --</option>
+                  {faculties.map((f) => (
+                    <option key={f.id} value={f.id}>{f.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex flex-col gap-xs">
                 <label className="text-label-md font-semibold text-on-surface-variant" htmlFor="user-role">Vai trò</label>
                 <select
                   id="user-role"
@@ -425,6 +629,123 @@ export default function UserManagementPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* Import Modal */}
+      {showImportModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-md">
+          <div className="fixed inset-0 bg-black/45 backdrop-blur-sm" onClick={() => {
+            if (importStatus !== "loading") {
+              setShowImportModal(false);
+              setImportStatus("idle");
+            }
+          }}></div>
+          <div className="relative bg-surface rounded-xl border border-outline-variant/30 shadow-2xl p-xl max-w-[500px] w-full flex flex-col gap-md z-10 animate-in fade-in zoom-in-95 duration-200">
+            {importStatus === "loading" ? (
+              <div className="flex flex-col items-center justify-center py-xl gap-md">
+                <span className="material-symbols-outlined animate-spin text-primary text-6xl">sync</span>
+                <h3 className="font-headline-sm text-on-surface font-bold text-center">Đang xử lý dữ liệu...</h3>
+                <p className="text-body-md text-on-surface-variant text-center">Hệ thống đang kiểm tra và tạo tài khoản. Vui lòng không đóng cửa sổ này.</p>
+              </div>
+            ) : importStatus === "success" || importStatus === "partial" ? (
+              <div className="flex flex-col items-center justify-center py-xl gap-md animate-in zoom-in duration-300">
+                <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-2 ${importStatus === "success" ? "bg-green-100 text-green-600" : "bg-tertiary-container text-on-tertiary-container"}`}>
+                  <span className="material-symbols-outlined text-4xl">{importStatus === "success" ? "check_circle" : "warning"}</span>
+                </div>
+                <h3 className="font-headline-sm text-on-surface font-bold">{importStatus === "success" ? "Hoàn tất!" : "Hoàn tất một phần"}</h3>
+                <p className="text-body-md text-on-surface-variant text-center font-medium">{importMessage}</p>
+                {importErrors.length > 0 && (
+                  <div className="w-full max-h-40 overflow-y-auto bg-error-container/20 border border-error-container p-sm rounded-lg text-body-sm text-error mt-2">
+                    <p className="font-bold mb-1">Các lỗi từ Server:</p>
+                    <ul className="list-none space-y-1">
+                      {importErrors.map((err, i) => <li key={i}>{err}</li>)}
+                    </ul>
+                  </div>
+                )}
+                <button
+                  onClick={() => {
+                    setShowImportModal(false);
+                    setImportStatus("idle");
+                    setImportErrors([]);
+                  }}
+                  className="mt-4 px-xl py-2.5 bg-primary text-on-primary rounded-lg font-label-md hover:bg-primary-container hover:text-on-primary-container transition-colors cursor-pointer"
+                >
+                  Đóng
+                </button>
+              </div>
+            ) : importStatus === "error" ? (
+              <div className="flex flex-col items-center justify-center py-xl gap-md animate-in zoom-in duration-300">
+                <div className="w-16 h-16 bg-error-container rounded-full flex items-center justify-center text-error mb-2">
+                  <span className="material-symbols-outlined text-4xl">error</span>
+                </div>
+                <h3 className="font-headline-sm text-error font-bold">Dữ liệu có lỗi!</h3>
+                <p className="text-body-md text-on-surface-variant text-center">Vui lòng sửa các lỗi sau trong file Excel và thử lại.</p>
+                <div className="w-full max-h-48 overflow-y-auto bg-surface-container-lowest border border-outline-variant p-md rounded-lg text-body-sm text-error text-left mt-2 shadow-inner">
+                  <ul className="list-disc pl-5 space-y-1">
+                    {importErrors.map((err, i) => <li key={i}>{err}</li>)}
+                  </ul>
+                </div>
+                <button
+                  onClick={() => {
+                    setImportStatus("idle");
+                    setImportErrors([]);
+                  }}
+                  className="mt-4 px-xl py-2.5 bg-surface-variant text-on-surface-variant rounded-lg font-label-md hover:bg-surface-container-highest transition-colors cursor-pointer"
+                >
+                  Thử lại
+                </button>
+              </div>
+            ) : (
+              <>
+                <h3 className="font-headline-md text-headline-md text-primary font-bold border-b border-outline-variant/40 pb-sm mb-sm">
+                  Nhập Người Dùng Từ Excel
+                </h3>
+                
+                <div className="flex flex-col gap-sm">
+                  <p className="text-body-md text-on-surface-variant">
+                    Vui lòng tải xuống file mẫu và điền dữ liệu theo đúng định dạng. Các cột yêu cầu: <b>Họ và tên</b>, <b>Email</b>, <b>Mật khẩu</b>, <b>Vai trò</b>, <b>Số điện thoại</b>, <b>Khoa</b>. Cột Vai trò chỉ chấp nhận: <i>Sinh viên, Giảng viên, Quản lý, Quản trị viên, Cựu sinh viên, Nhà tuyển dụng</i>.
+                  </p>
+                  
+                  <button 
+                    onClick={handleDownloadTemplate}
+                    className="mt-2 text-primary font-label-md flex items-center gap-2 hover:underline self-start bg-transparent border-none cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[20px]">download</span>
+                    Tải file Excel mẫu
+                  </button>
+                </div>
+
+                <div className="mt-md border-2 border-dashed border-outline-variant rounded-xl p-xl flex flex-col items-center justify-center bg-surface-container-lowest relative overflow-hidden group">
+                  <span className="material-symbols-outlined text-4xl text-on-surface-variant mb-2 group-hover:scale-110 transition-transform duration-300">upload_file</span>
+                  <p className="text-label-md text-on-surface font-semibold mb-1">Kéo thả file vào đây hoặc nhấn để chọn</p>
+                  <p className="text-body-sm text-on-surface-variant mb-4">Hỗ trợ định dạng .xlsx, .xls (Tối đa 500 dòng)</p>
+                  
+                  <input
+                    type="file"
+                    id="excel-upload"
+                    accept=".xlsx, .xls"
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                    onChange={handleFileUpload}
+                  />
+                  <label 
+                    htmlFor="excel-upload"
+                    className="px-4 py-2 bg-primary-container text-on-primary-container rounded-lg font-label-md pointer-events-none group-hover:bg-primary/20 transition-colors"
+                  >
+                    Chọn file Excel
+                  </label>
+                </div>
+
+                <div className="flex gap-sm justify-end mt-lg">
+                  <button
+                    onClick={() => setShowImportModal(false)}
+                    className="px-md py-2 border border-outline-variant rounded-lg text-label-md font-label-md text-on-surface hover:bg-surface-container-low transition-colors cursor-pointer"
+                  >
+                    Hủy bỏ
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}

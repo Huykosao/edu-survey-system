@@ -18,11 +18,14 @@ class CreateUserRequest(BaseModel):
     password: str = Field(..., min_length=6)
     full_name: str = Field(..., min_length=1, max_length=255)
     role_ids: Optional[list[int]] = None
+    phone: Optional[str] = None
+    faculty_id: Optional[int] = None
+    faculty_name: Optional[str] = None
 
 
 class BulkCreateUserRequest(BaseModel):
     """Body POST /api/users/bulk — Admin tạo nhiều user cùng lúc."""
-    users: list[CreateUserRequest]
+    users: list[CreateUserRequest] = Field(..., max_length=500)
 
 
 class UpdateUserRequest(BaseModel):
@@ -30,6 +33,8 @@ class UpdateUserRequest(BaseModel):
     full_name: Optional[str] = Field(None, max_length=255)
     status: Optional[str] = None          # active | inactive | locked
     role_ids: Optional[list[int]] = None
+    phone: Optional[str] = None
+    faculty_id: Optional[int] = None
 
 
 class UpdateUserStatusRequest(BaseModel):
@@ -73,6 +78,9 @@ class UserPublicResponse(BaseModel):
     roles: list[str] = []
     last_login: Optional[datetime] = None
     created_at: Optional[datetime] = None
+    phone: Optional[str] = None
+    faculty_id: Optional[int] = None
+    faculty_name: Optional[str] = None
 
 
 class UserListResponse(BaseModel):

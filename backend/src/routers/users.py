@@ -66,19 +66,107 @@ def get_user(user_id: int, _: dict = Depends(require_admin_or_manager)):
 @router.post("/users", response_model=UserPublicResponse)
 def create_user(req: CreateUserRequest, current_user: dict = Depends(require_admin)):
     """Tạo user mới. [ADMIN]"""
+    from src.repositories.user import upsert_profile_details, delete_user
+    from src.core.database import supabase_client
     new_user = create_user_service(req)
-    roles = []
-    if req.role_ids:
-        set_user_roles(new_user["id"], req.role_ids)
-        roles = get_user_roles(new_user["id"])
-    from src.services.user import sanitize_user
-    return sanitize_user(new_user, roles)
+    user_id = new_user["id"]
+    try:
+        roles = []
+        if req.role_ids:
+            set_user_roles(user_id, req.role_ids)
+            roles = get_user_roles(user_id)
+            
+        profile_data = {}
+        if req.phone:
+            profile_data["metadata"] = {"phone": req.phone}
+        if req.faculty_id:
+            profile_data["faculty_id"] = req.faculty_id
+        if profile_data:
+            upsert_profile_details(user_id, profile_data)
+            
+        from src.services.user import sanitize_user
+        return sanitize_user(new_user, roles)
+    except Exception as e:
+        try:
+            supabase_client.table("user_roles").delete().eq("user_id", user_id).execute()
+            supabase_client.table("profile_details").delete().eq("user_id", user_id).execute()
+            delete_user(user_id)
+        except Exception as cleanup_err:
+            print(f"Cleanup failed for user {user_id}: {cleanup_err}")
+        raise e
+
+
+@router.post("/users/bulk")
+def bulk_create_users(req: BulkCreateUserRequest, _: dict = Depends(require_admin)):
+    """Tạo nhiều user cùng lúc từ file Excel. [ADMIN]"""
+    from src.services.auth import create_user_service
+    from src.repositories.role import set_user_roles
+    from src.core.database import supabase_client
+    from src.repositories.user import upsert_profile_details, delete_user
+    
+    fac_res = supabase_client.table("faculties").select("id, name").execute()
+    faculties_map = {}
+    if fac_res.data:
+        for f in fac_res.data:
+            if f.get("name"):
+                faculties_map[f["name"].strip().lower()] = f["id"]
+    
+    success_count = 0
+    errors = []
+    for user_req in req.users:
+        user_id = None
+        try:
+            profile_data = {}
+            if user_req.phone:
+                profile_data["metadata"] = {"phone": user_req.phone}
+                
+            if user_req.faculty_id:
+                profile_data["faculty_id"] = user_req.faculty_id
+            elif user_req.faculty_name:
+                fname_lower = user_req.faculty_name.lower().strip()
+                if fname_lower in faculties_map:
+                    profile_data["faculty_id"] = faculties_map[fname_lower]
+                else:
+                    raise ValueError(f"Khoa '{user_req.faculty_name}' không tồn tại trong hệ thống")
+
+            new_user = create_user_service(user_req)
+            user_id = new_user["id"]
+            if user_req.role_ids:
+                set_user_roles(user_id, user_req.role_ids)
+
+            if profile_data:
+                upsert_profile_details(user_id, profile_data)
+                
+            success_count += 1
+        except Exception as e:
+            if user_id is not None:
+                try:
+                    supabase_client.table("user_roles").delete().eq("user_id", user_id).execute()
+                    supabase_client.table("profile_details").delete().eq("user_id", user_id).execute()
+                    delete_user(user_id)
+                except Exception as cleanup_err:
+                    print(f"Cleanup failed for user {user_id}: {cleanup_err}")
+                    
+            # Extract error message
+            err_msg = str(e)
+            if hasattr(e, "detail"):
+                err_msg = e.detail
+            elif "duplicate key" in str(e).lower() or "already exists" in str(e).lower():
+                err_msg = "Email hoặc tài khoản đã tồn tại"
+            errors.append({"email": user_req.email, "error": err_msg})
+            
+    return {
+        "success_count": success_count,
+        "total_count": len(req.users),
+        "errors": errors,
+        "message": f"Đã tạo thành công {success_count} trên tổng số {len(req.users)} người dùng."
+    }
 
 
 @router.put("/users/{user_id}", response_model=MessageResponse)
 def update_user(user_id: int, req: UpdateUserRequest, _: dict = Depends(require_admin)):
     """Cập nhật thông tin và/hoặc roles của user. [ADMIN]"""
-    return update_user_info(user_id, req.model_dump(exclude_none=True))
+    return update_user_info(user_id, req.model_dump(exclude_unset=True))
 
 
 @router.delete("/users/{user_id}", response_model=MessageResponse)
