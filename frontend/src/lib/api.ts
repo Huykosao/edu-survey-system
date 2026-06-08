@@ -194,8 +194,25 @@ export const usersApi = {
     full_name: string;
     password: string;
     role_ids?: number[];
+    phone?: string;
+    faculty_id?: number;
   }) =>
     apiFetch("/api/users", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  bulkCreate: (data: {
+    users: {
+      email: string;
+      full_name: string;
+      password: string;
+      role_ids?: number[];
+      phone?: string;
+      faculty_name?: string;
+    }[];
+  }) =>
+    apiFetch("/api/users/bulk", {
       method: "POST",
       body: JSON.stringify(data),
     }),

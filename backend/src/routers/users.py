@@ -71,8 +71,68 @@ def create_user(req: CreateUserRequest, current_user: dict = Depends(require_adm
     if req.role_ids:
         set_user_roles(new_user["id"], req.role_ids)
         roles = get_user_roles(new_user["id"])
+        
+    profile_data = {}
+    if req.phone:
+        profile_data["metadata"] = {"phone": req.phone}
+    if req.faculty_id:
+        profile_data["faculty_id"] = req.faculty_id
+    if profile_data:
+        upsert_profile_details(new_user["id"], profile_data)
+        
     from src.services.user import sanitize_user
     return sanitize_user(new_user, roles)
+
+
+@router.post("/users/bulk", response_model=MessageResponse)
+def bulk_create_users(req: BulkCreateUserRequest, _: dict = Depends(require_admin)):
+    """Tạo nhiều user cùng lúc từ file Excel. [ADMIN]"""
+    from src.services.auth import create_user_service
+    from src.repositories.role import set_user_roles
+    from src.core.database import supabase_client
+    
+    fac_res = supabase_client.table("faculties").select("id, name").execute()
+    faculties_map = {f["name"].lower(): f["id"] for f in fac_res.data} if fac_res.data else {}
+    
+    success_count = 0
+    errors = []
+    for idx, user_req in enumerate(req.users):
+        try:
+            new_user = create_user_service(user_req)
+            user_id = new_user["id"]
+            if user_req.role_ids:
+                set_user_roles(user_id, user_req.role_ids)
+                
+            profile_data = {}
+            if user_req.phone:
+                profile_data["metadata"] = {"phone": user_req.phone}
+                
+            if user_req.faculty_id:
+                profile_data["faculty_id"] = user_req.faculty_id
+            elif user_req.faculty_name:
+                fname_lower = user_req.faculty_name.lower().strip()
+                if fname_lower in faculties_map:
+                    profile_data["faculty_id"] = faculties_map[fname_lower]
+
+            if profile_data:
+                upsert_profile_details(user_id, profile_data)
+                
+            success_count += 1
+        except Exception as e:
+            # Extract error message
+            err_msg = str(e)
+            if hasattr(e, "detail"):
+                err_msg = e.detail
+            elif "duplicate key" in str(e).lower() or "already exists" in str(e).lower():
+                err_msg = "Email hoặc tài khoản đã tồn tại"
+            errors.append({"email": user_req.email, "error": err_msg})
+            
+    return {
+        "success_count": success_count,
+        "total_count": len(req.users),
+        "errors": errors,
+        "message": f"Đã tạo thành công {success_count} trên tổng số {len(req.users)} người dùng."
+    }
 
 
 @router.put("/users/{user_id}", response_model=MessageResponse)
