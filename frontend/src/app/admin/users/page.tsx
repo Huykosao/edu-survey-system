@@ -219,6 +219,20 @@ export default function UserManagementPage() {
             phone = "0" + phone;
           }
 
+          let roleIds = [4]; // STUDENT mặc định
+          const validRoles = ["Sinh viên", "Quản trị viên", "Quản lý", "Giảng viên", "Cựu sinh viên", "Nhà tuyển dụng"];
+          
+          if (!validRoles.includes(roleName)) {
+            frontendErrors.push(`Dòng ${rowNum}: Vai trò không hợp lệ (${roleName}). Hợp lệ: ${validRoles.join(", ")}`);
+          } else {
+            if (roleName === "Quản trị viên") roleIds = [1];
+            else if (roleName === "Quản lý") roleIds = [2];
+            else if (roleName === "Giảng viên") roleIds = [3];
+            else if (roleName === "Cựu sinh viên") roleIds = [5];
+            else if (roleName === "Nhà tuyển dụng") roleIds = [6];
+            else roleIds = [4]; // Sinh viên
+          }
+
           if (!name || !email || !password) {
             frontendErrors.push(`Dòng ${rowNum}: Thiếu thông tin bắt buộc (Họ tên, Email, Mật khẩu).`);
           } else {
@@ -226,20 +240,13 @@ export default function UserManagementPage() {
             if (!emailRegex.test(email)) {
               frontendErrors.push(`Dòng ${rowNum}: Email không hợp lệ (${email}).`);
             }
-            if (phone && !/^(0|\+84)[3|5|7|8|9][0-9]{8}$/.test(phone)) {
+            if (phone && !/^(0|\+84)[35789][0-9]{8}$/.test(phone)) {
               frontendErrors.push(`Dòng ${rowNum}: Số điện thoại không hợp lệ (${phone}).`);
             }
             if (password.length < 6) {
               frontendErrors.push(`Dòng ${rowNum}: Mật khẩu phải có ít nhất 6 ký tự.`);
             }
           }
-
-          let roleIds = [4]; // STUDENT
-          if (roleName === "Quản trị viên") roleIds = [1];
-          else if (roleName === "Quản lý") roleIds = [2];
-          else if (roleName === "Giảng viên") roleIds = [3];
-          else if (roleName === "Cựu sinh viên") roleIds = [5];
-          else if (roleName === "Nhà tuyển dụng") roleIds = [6];
 
           return {
             full_name: name,
