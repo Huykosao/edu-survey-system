@@ -33,6 +33,9 @@ def sanitize_user(user: dict, roles: list[str]) -> dict:
         "roles": roles,
         "last_login": user.get("last_login"),
         "created_at": user.get("created_at"),
+        "phone": user.get("phone"),
+        "faculty_id": user.get("faculty_id"),
+        "faculty_name": user.get("faculty_name"),
     }
 
 
@@ -49,10 +52,17 @@ def get_users_list(role_filter: str | None, status: str | None, page: int, limit
     # N+1 query fix: fetch all roles in one query
     retrieved_user_ids = [u["id"] for u in users_raw]
     roles_by_user = get_users_roles(retrieved_user_ids)
+    
+    from src.repositories.user import get_profiles_by_user_ids
+    profiles_by_user = get_profiles_by_user_ids(retrieved_user_ids)
 
     users_with_roles = []
     for u in users_raw:
         roles = roles_by_user.get(u["id"], [])
+        profile = profiles_by_user.get(u["id"], {})
+        u["phone"] = profile.get("phone")
+        u["faculty_id"] = profile.get("faculty_id")
+        u["faculty_name"] = profile.get("faculty_name")
         users_with_roles.append(sanitize_user(u, roles))
 
     return {"data": users_with_roles, "total": total}
@@ -63,6 +73,13 @@ def get_single_user(user_id: int) -> dict:
     if not user:
         raise HTTPException(status_code=404, detail="Không tìm thấy người dùng")
     roles = get_user_roles(user_id)
+    
+    from src.repositories.user import get_profiles_by_user_ids
+    profile = get_profiles_by_user_ids([user_id]).get(user_id, {})
+    user["phone"] = profile.get("phone")
+    user["faculty_id"] = profile.get("faculty_id")
+    user["faculty_name"] = profile.get("faculty_name")
+    
     return sanitize_user(user, roles)
 
 
@@ -75,8 +92,25 @@ def update_user_info(user_id: int, data: dict) -> dict:
         update_data["status"] = data["status"]
     if update_data:
         update_user(user_id, update_data)
+        
     if "role_ids" in data:
         set_user_roles(user_id, data["role_ids"])
+        
+    profile_data = {}
+    from src.repositories.user import get_profile_details, upsert_profile_details
+    existing_profile = get_profile_details(user_id) or {}
+    
+    if "phone" in data:
+        metadata = existing_profile.get("metadata") or {}
+        metadata["phone"] = data["phone"]
+        profile_data["metadata"] = metadata
+        
+    if "faculty_id" in data:
+        profile_data["faculty_id"] = data["faculty_id"]
+        
+    if profile_data:
+        upsert_profile_details(user_id, profile_data)
+        
     return {"message": "Cập nhật thành công"}
 
 

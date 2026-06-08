@@ -3,7 +3,7 @@
 import React, { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { usersApi } from "@/lib/api";
+import { usersApi, facultiesApi } from "@/lib/api";
 
 interface UserProfile {
   id: string;
@@ -35,6 +35,15 @@ function EditUserForm() {
 
   const [loading, setLoading] = useState(true);
 
+  const [faculties, setFaculties] = useState<{ id: number; name: string }[]>([]);
+
+  // Load faculties on init
+  useEffect(() => {
+    facultiesApi.list()
+      .then((res: any) => setFaculties(res))
+      .catch((err) => console.error("Error loading faculties:", err));
+  }, []);
+
   // Load real data on init
   useEffect(() => {
     if (!userId) return;
@@ -54,8 +63,8 @@ function EditUserForm() {
           id: res.id.toString(),
           name: res.full_name,
           email: res.email,
-          phone: "0900000000",
-          dept: "Chưa cập nhật",
+          phone: res.phone || "",
+          dept: res.faculty_id ? res.faculty_id.toString() : "",
           role: r as any,
           status: res.status === "active" ? "active" : "locked",
         });
@@ -77,7 +86,9 @@ function EditUserForm() {
       await usersApi.update(parseInt(userId), {
         full_name: profile.name,
         role_ids: [role_id],
-        status: profile.status === "active" ? "active" : "inactive"
+        status: profile.status === "active" ? "active" : "inactive",
+        phone: profile.phone || undefined,
+        faculty_id: profile.dept ? parseInt(profile.dept) : undefined,
       });
 
       setToastMessage("Đã lưu các thay đổi của người dùng thành công!");
@@ -214,10 +225,12 @@ function EditUserForm() {
                   onChange={(e) => setProfile({ ...profile, dept: e.target.value })}
                   className="w-full p-3 bg-surface-container-lowest border border-outline-variant rounded-lg text-body-md font-body-md text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
                 >
-                  <option>Khoa Công nghệ Thông tin</option>
-                  <option>Khoa Kinh tế</option>
-                  <option>Phòng Đào tạo</option>
-                  <option>Khác</option>
+                  <option value="">-- Chưa cập nhật --</option>
+                  {faculties.map((f) => (
+                    <option key={f.id} value={f.id.toString()}>
+                      {f.name}
+                    </option>
+                  ))}
                 </select>
               </div>
             </div>

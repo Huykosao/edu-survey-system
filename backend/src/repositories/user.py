@@ -100,15 +100,27 @@ def get_profile_details(user_id: int) -> dict | None:
     return result.data[0] if result.data else None
 
 
-def upsert_profile_details(user_id: int, data: dict) -> None:
-    data.pop("user_id", None)
-    existing = (
-        supabase_client.table("profile_details")
-        .select("user_id")
-        .eq("user_id", user_id)
-        .execute()
-    )
-    if existing.data:
-        supabase_client.table("profile_details").update(data).eq("user_id", user_id).execute()
-    else:
-        supabase_client.table("profile_details").insert({**data, "user_id": user_id}).execute()
+def upsert_profile_details(user_id: int, data: dict) -> dict:
+    data["user_id"] = user_id
+    result = supabase_client.table("profile_details").upsert(data, on_conflict="user_id").execute()
+    return result.data[0]
+
+
+def get_profiles_by_user_ids(user_ids: list[int]) -> dict:
+    if not user_ids:
+        return {}
+    res = supabase_client.table("profile_details").select("user_id, faculty_id, metadata").in_("user_id", user_ids).execute()
+    
+    fac_res = supabase_client.table("faculties").select("id, name").execute()
+    fac_map = {f["id"]: f["name"] for f in fac_res.data} if fac_res.data else {}
+    
+    profiles = {}
+    if res.data:
+        for p in res.data:
+            metadata = p.get("metadata") or {}
+            profiles[p["user_id"]] = {
+                "phone": metadata.get("phone"),
+                "faculty_id": p.get("faculty_id"),
+                "faculty_name": fac_map.get(p.get("faculty_id"))
+            }
+    return profiles

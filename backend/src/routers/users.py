@@ -67,6 +67,7 @@ def get_user(user_id: int, _: dict = Depends(require_admin_or_manager)):
 def create_user(req: CreateUserRequest, current_user: dict = Depends(require_admin)):
     """Tạo user mới. [ADMIN]"""
     from src.repositories.user import upsert_profile_details, delete_user
+    from src.core.database import supabase_client
     new_user = create_user_service(req)
     user_id = new_user["id"]
     try:
@@ -86,7 +87,12 @@ def create_user(req: CreateUserRequest, current_user: dict = Depends(require_adm
         from src.services.user import sanitize_user
         return sanitize_user(new_user, roles)
     except Exception as e:
-        delete_user(user_id)
+        try:
+            supabase_client.table("user_roles").delete().eq("user_id", user_id).execute()
+            supabase_client.table("profile_details").delete().eq("user_id", user_id).execute()
+            delete_user(user_id)
+        except Exception as cleanup_err:
+            print(f"Cleanup failed for user {user_id}: {cleanup_err}")
         raise e
 
 
@@ -135,9 +141,11 @@ def bulk_create_users(req: BulkCreateUserRequest, _: dict = Depends(require_admi
         except Exception as e:
             if user_id is not None:
                 try:
+                    supabase_client.table("user_roles").delete().eq("user_id", user_id).execute()
+                    supabase_client.table("profile_details").delete().eq("user_id", user_id).execute()
                     delete_user(user_id)
-                except Exception:
-                    pass # Ignore rollback errors to continue processing
+                except Exception as cleanup_err:
+                    print(f"Cleanup failed for user {user_id}: {cleanup_err}")
                     
             # Extract error message
             err_msg = str(e)

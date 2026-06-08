@@ -182,12 +182,19 @@ export default function UserManagementPage() {
       try {
         const ab = evt.target?.result;
         const wb = XLSX.read(ab, { type: "array" });
+        if (!wb.SheetNames || wb.SheetNames.length === 0) {
+          alert("File Excel không hợp lệ hoặc không có trang tính.");
+          return;
+        }
         const wsname = wb.SheetNames[0];
         const ws = wb.Sheets[wsname];
-        const data: any[] = XLSX.utils.sheet_to_json(ws);
+        const rawData: any[] = XLSX.utils.sheet_to_json(ws);
+
+        // Lọc các hàng trống hoàn toàn
+        const data = rawData.filter(row => Object.keys(row).some(key => row[key] !== undefined && row[key] !== null && row[key].toString().trim() !== ""));
 
         if (data.length === 0) {
-          alert("File Excel trống hoặc không đúng định dạng!");
+          alert("File Excel trống hoặc không có dữ liệu hợp lệ!");
           return;
         }
 
@@ -200,6 +207,8 @@ export default function UserManagementPage() {
           const password = row["Mật khẩu"]?.toString() || "";
           let phone = row["Số điện thoại"]?.toString().trim() || "";
           const roleName = row["Vai trò"]?.toString().trim() || "Sinh viên";
+          let facultyName = row["Khoa"]?.toString().trim();
+          if (!facultyName) facultyName = undefined;
 
           // Khôi phục số 0 đứng đầu nếu Excel tự động chuyển thành số và làm mất
           if (phone && phone.length === 9 && /^[35789]/.test(phone)) {
@@ -234,7 +243,7 @@ export default function UserManagementPage() {
             password: password,
             role_ids: roleIds,
             phone: phone || undefined,
-            faculty_name: row["Khoa"]?.toString() || undefined
+            faculty_name: facultyName
           };
         }).filter(u => u.full_name && u.email && u.password);
 
