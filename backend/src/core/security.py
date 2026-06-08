@@ -74,6 +74,11 @@ def get_current_user(
         raise HTTPException(status_code=401, detail="Chưa đăng nhập")
 
     payload = decode_token(credentials.credentials)
+
+    # Chỉ chấp nhận access token, từ chối refresh token
+    if payload.get("type") == "refresh":
+        raise HTTPException(status_code=401, detail="Token không hợp lệ")
+
     try:
         user_id = int(payload.get("sub") or 0)
     except (ValueError, TypeError):

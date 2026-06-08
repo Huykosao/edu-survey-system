@@ -111,6 +111,7 @@ async function apiFetch<T = unknown>(
         if (typeof window !== "undefined") {
           window.location.href = "/login";
         }
+        throw new ApiError("Session expired", 401);
       }
     }
     

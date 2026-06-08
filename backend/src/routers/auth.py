@@ -129,6 +129,8 @@ def refresh_token(req: RefreshTokenRequest):
             "refresh_token": new_refresh_token,
             "token_type": "bearer"
         }
+    except HTTPException:
+        raise
     except Exception:
         raise HTTPException(status_code=401, detail="Token không hợp lệ hoặc đã hết hạn")
 
@@ -138,7 +140,6 @@ class ForgotPasswordRequest(BaseModel):
 @router.post("/forgot-password")
 def forgot_password(req: ForgotPasswordRequest):
     """Tạo mật khẩu ngẫu nhiên và gửi qua email."""
-    from src.repositories.user import get_user_by_email, update_password_hash
     import random
     import string
     
