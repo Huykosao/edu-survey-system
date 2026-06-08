@@ -111,16 +111,21 @@ def get_profiles_by_user_ids(user_ids: list[int]) -> dict:
         return {}
     res = supabase_client.table("profile_details").select("user_id, faculty_id, metadata").in_("user_id", user_ids).execute()
     
-    fac_res = supabase_client.table("faculties").select("id, name").execute()
-    fac_map = {f["id"]: f["name"] for f in fac_res.data} if fac_res.data else {}
-    
     profiles = {}
-    if res.data:
-        for p in res.data:
-            metadata = p.get("metadata") or {}
-            profiles[p["user_id"]] = {
-                "phone": metadata.get("phone"),
-                "faculty_id": p.get("faculty_id"),
-                "faculty_name": fac_map.get(p.get("faculty_id"))
-            }
+    if not res.data:
+        return profiles
+        
+    faculty_ids = list(set([p["faculty_id"] for p in res.data if p.get("faculty_id")]))
+    fac_map = {}
+    if faculty_ids:
+        fac_res = supabase_client.table("faculties").select("id, name").in_("id", faculty_ids).execute()
+        fac_map = {f["id"]: f["name"] for f in fac_res.data} if fac_res.data else {}
+    
+    for p in res.data:
+        metadata = p.get("metadata") or {}
+        profiles[p["user_id"]] = {
+            "phone": metadata.get("phone"),
+            "faculty_id": p.get("faculty_id"),
+            "faculty_name": fac_map.get(p.get("faculty_id"))
+        }
     return profiles

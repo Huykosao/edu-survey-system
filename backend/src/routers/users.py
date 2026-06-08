@@ -116,11 +116,6 @@ def bulk_create_users(req: BulkCreateUserRequest, _: dict = Depends(require_admi
     for idx, user_req in enumerate(req.users):
         user_id = None
         try:
-            new_user = create_user_service(user_req)
-            user_id = new_user["id"]
-            if user_req.role_ids:
-                set_user_roles(user_id, user_req.role_ids)
-                
             profile_data = {}
             if user_req.phone:
                 profile_data["metadata"] = {"phone": user_req.phone}
@@ -133,6 +128,11 @@ def bulk_create_users(req: BulkCreateUserRequest, _: dict = Depends(require_admi
                     profile_data["faculty_id"] = faculties_map[fname_lower]
                 else:
                     raise ValueError(f"Khoa '{user_req.faculty_name}' không tồn tại trong hệ thống")
+
+            new_user = create_user_service(user_req)
+            user_id = new_user["id"]
+            if user_req.role_ids:
+                set_user_roles(user_id, user_req.role_ids)
 
             if profile_data:
                 upsert_profile_details(user_id, profile_data)
@@ -166,7 +166,7 @@ def bulk_create_users(req: BulkCreateUserRequest, _: dict = Depends(require_admi
 @router.put("/users/{user_id}", response_model=MessageResponse)
 def update_user(user_id: int, req: UpdateUserRequest, _: dict = Depends(require_admin)):
     """Cập nhật thông tin và/hoặc roles của user. [ADMIN]"""
-    return update_user_info(user_id, req.model_dump(exclude_none=True))
+    return update_user_info(user_id, req.model_dump(exclude_unset=True))
 
 
 @router.delete("/users/{user_id}", response_model=MessageResponse)

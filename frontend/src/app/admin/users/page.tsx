@@ -181,6 +181,10 @@ export default function UserManagementPage() {
     reader.onload = async (evt) => {
       try {
         const ab = evt.target?.result;
+        if (!(ab instanceof ArrayBuffer)) {
+          alert("Lỗi đọc file: Không thể đọc dữ liệu nhị phân.");
+          return;
+        }
         const wb = XLSX.read(ab, { type: "array" });
         if (!wb.SheetNames || wb.SheetNames.length === 0) {
           alert("File Excel không hợp lệ hoặc không có trang tính.");
@@ -208,7 +212,7 @@ export default function UserManagementPage() {
           let phone = row["Số điện thoại"]?.toString().trim() || "";
           const roleName = row["Vai trò"]?.toString().trim() || "Sinh viên";
           let facultyName = row["Khoa"]?.toString().trim();
-          if (!facultyName) facultyName = undefined;
+          if (!facultyName) facultyName = null;
 
           // Khôi phục số 0 đứng đầu nếu Excel tự động chuyển thành số và làm mất
           if (phone && phone.length === 9 && /^[35789]/.test(phone)) {
@@ -242,7 +246,7 @@ export default function UserManagementPage() {
             email: email,
             password: password,
             role_ids: roleIds,
-            phone: phone || undefined,
+            phone: phone || null,
             faculty_name: facultyName
           };
         }).filter(u => u.full_name && u.email && u.password);

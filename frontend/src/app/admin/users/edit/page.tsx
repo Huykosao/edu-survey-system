@@ -87,8 +87,8 @@ function EditUserForm() {
         full_name: profile.name,
         role_ids: [role_id],
         status: profile.status === "active" ? "active" : "inactive",
-        phone: profile.phone || undefined,
-        faculty_id: profile.dept ? parseInt(profile.dept) : undefined,
+        phone: profile.phone || null,
+        faculty_id: profile.dept ? parseInt(profile.dept) : null,
       });
 
       setToastMessage("Đã lưu các thay đổi của người dùng thành công!");

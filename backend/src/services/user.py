@@ -102,7 +102,10 @@ def update_user_info(user_id: int, data: dict) -> dict:
     
     if "phone" in data:
         metadata = existing_profile.get("metadata") or {}
-        metadata["phone"] = data["phone"]
+        if data["phone"] is None:
+            metadata.pop("phone", None)
+        else:
+            metadata["phone"] = data["phone"]
         profile_data["metadata"] = metadata
         
     if "faculty_id" in data:
