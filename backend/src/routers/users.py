@@ -113,7 +113,7 @@ def bulk_create_users(req: BulkCreateUserRequest, _: dict = Depends(require_admi
     
     success_count = 0
     errors = []
-    for idx, user_req in enumerate(req.users):
+    for user_req in req.users:
         user_id = None
         try:
             profile_data = {}

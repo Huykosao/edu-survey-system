@@ -103,7 +103,7 @@ def get_profile_details(user_id: int) -> dict | None:
 def upsert_profile_details(user_id: int, data: dict) -> dict:
     data["user_id"] = user_id
     result = supabase_client.table("profile_details").upsert(data, on_conflict="user_id").execute()
-    return result.data[0]
+    return result.data[0] if result.data else {}
 
 
 def get_profiles_by_user_ids(user_ids: list[int]) -> dict:
@@ -115,7 +115,7 @@ def get_profiles_by_user_ids(user_ids: list[int]) -> dict:
     if not res.data:
         return profiles
         
-    faculty_ids = list(set([p["faculty_id"] for p in res.data if p.get("faculty_id")]))
+    faculty_ids = list(set([p["faculty_id"] for p in res.data if p.get("faculty_id") is not None]))
     fac_map = {}
     if faculty_ids:
         fac_res = supabase_client.table("faculties").select("id, name").in_("id", faculty_ids).execute()
