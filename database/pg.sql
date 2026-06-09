@@ -231,6 +231,27 @@ INSERT INTO public.allowed_domains (domain, description) VALUES
 ('edu.vn', 'Tên miền giáo dục chung'),
 ('student.edu.vn', 'Tên miền sinh viên');
 
+CREATE TABLE public.student_response_class (
+    id SERIAL PRIMARY KEY,
+    label_name VARCHAR(255) UNIQUE NOT NULL,
+    label_description TEXT,
+    created_at TIMESTAMPTZ DEFAULT now()
+)
+
+CREATE TABLE public.teacher_response_class (
+    id SERIAL PRIMARY KEY,
+    label_name VARCHAR(255) UNIQUE NOT NULL,
+    label_description TEXT,
+    created_at TIMESTAMPTZ DEFAULT now()
+)
+
+CREATE TABLE public.employer_response_class (
+    id SERIAL PRIMARY KEY,
+    label_name VARCHAR(255) UNIQUE NOT NULL,
+    label_description TEXT,
+    created_at TIMESTAMPTZ DEFAULT now()
+)
+
 
 -- ==========================================
 -- 10. CHỈ MỤC TỐI ƯU (INDEXES)
