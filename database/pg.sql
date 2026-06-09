@@ -231,26 +231,61 @@ INSERT INTO public.allowed_domains (domain, description) VALUES
 ('edu.vn', 'Tên miền giáo dục chung'),
 ('student.edu.vn', 'Tên miền sinh viên');
 
-CREATE TABLE public.student_response_class (
+CREATE TABLE public.survey_label_definitions (
     id SERIAL PRIMARY KEY,
-    label_name VARCHAR(255) UNIQUE NOT NULL,
+    role_id INT NOT NULL REFERENCES public.roles(id) ON DELETE CASCADE,
+    label_name VARCHAR(255) NOT NULL,
     label_description TEXT,
-    created_at TIMESTAMPTZ DEFAULT now()
-)
+    created_at TIMESTAMPTZ DEFAULT now(),
+    
+    -- Một Role không được có 2 nhãn trùng tên
+    UNIQUE(role_id, label_name)
+);
 
-CREATE TABLE public.teacher_response_class (
-    id SERIAL PRIMARY KEY,
-    label_name VARCHAR(255) UNIQUE NOT NULL,
-    label_description TEXT,
-    created_at TIMESTAMPTZ DEFAULT now()
-)
+CREATE INDEX idx_label_role_id ON public.survey_label_definitions(role_id);
 
-CREATE TABLE public.employer_response_class (
-    id SERIAL PRIMARY KEY,
-    label_name VARCHAR(255) UNIQUE NOT NULL,
-    label_description TEXT,
+CREATE TABLE public.response_labels (
+    id BIGSERIAL PRIMARY KEY,
+
+    response_id INT NOT NULL
+        REFERENCES public.survey_responses(id)
+        ON DELETE CASCADE,
+
+    label_id INT NOT NULL,
+
+    sentiment VARCHAR(20) NOT NULL
+        CHECK(sentiment IN ('positive','negative')),
+
+    confidence NUMERIC(5,4),
+
     created_at TIMESTAMPTZ DEFAULT now()
-)
+);
+
+CREATE INDEX idx_response_labels_response
+ON public.response_labels(response_id);
+
+CREATE INDEX idx_response_labels_label
+ON public.response_labels(label_id);
+
+CREATE TABLE public.ai_label_summaries (
+    id BIGSERIAL PRIMARY KEY,
+
+    survey_id INT NOT NULL
+        REFERENCES public.surveys(id)
+        ON DELETE CASCADE,
+
+    label_id INT NOT NULL,
+
+    sentiment VARCHAR(20) NOT NULL,
+
+    total_count INT DEFAULT 0,
+
+    summary TEXT,
+
+    representative_comments JSONB DEFAULT '[]',
+
+    created_at TIMESTAMPTZ DEFAULT now()
+);
 
 
 -- ==========================================
