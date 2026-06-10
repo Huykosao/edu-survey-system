@@ -327,7 +327,7 @@ export default function UserManagementPage() {
   const paginatedUsers = filteredUsers.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
   return (
-    <div className="flex flex-col gap-3 md:gap-lg animate-in fade-in duration-300 h-auto md:h-[calc(100vh-7rem)] min-h-0">
+    <div className="flex flex-col gap-3 md:gap-lg animate-in fade-in duration-300 h-auto md:h-full min-h-0">
       {/* Header Section */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 md:gap-md border-b border-outline-variant/30 pb-2 md:pb-md">
         <div>
@@ -557,7 +557,7 @@ export default function UserManagementPage() {
                   <th className="px-4 w-12 text-center bg-surface-container-high border-b border-outline-variant h-11">
                     <input 
                       type="checkbox" 
-                      checked={paginatedUsers.length > 0 && selectedUsers.length === paginatedUsers.length}
+                      checked={paginatedUsers.length > 0 && paginatedUsers.every(u => selectedUsers.includes(u.id))}
                       onChange={handleSelectAll}
                       className="rounded border-outline-variant text-primary focus:ring-primary cursor-pointer w-4 h-4 animate-none" 
                     />
