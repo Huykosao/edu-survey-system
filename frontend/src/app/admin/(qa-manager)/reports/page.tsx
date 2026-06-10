@@ -443,14 +443,17 @@ export default function ReportsPage() {
     // Đóng khung tất cả các ô có dữ liệu ở phần chi tiết
     sheet.eachRow((row, rowNumber) => {
       if (rowNumber > detailsStartRowNumber) {
-        row.eachCell({ includeEmpty: false }, (cell) => {
-          cell.border = {
-            top: { style: "thin", color: { argb: "FFC5C5D3" } },
-            left: { style: "thin", color: { argb: "FFC5C5D3" } },
-            bottom: { style: "thin", color: { argb: "FFC5C5D3" } },
-            right: { style: "thin", color: { argb: "FFC5C5D3" } },
-          };
-        });
+        if (row.cellCount > 0) {
+          for (let colIdx = 1; colIdx <= 8; colIdx++) {
+            const cell = row.getCell(colIdx);
+            cell.border = {
+              top: { style: "thin", color: { argb: "FFC5C5D3" } },
+              left: { style: "thin", color: { argb: "FFC5C5D3" } },
+              bottom: { style: "thin", color: { argb: "FFC5C5D3" } },
+              right: { style: "thin", color: { argb: "FFC5C5D3" } },
+            };
+          }
+        }
       }
     });
 
