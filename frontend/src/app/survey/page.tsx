@@ -63,6 +63,7 @@ export default function SurveyRespondentPage() {
   const [loadingData, setLoadingData] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [dashboardError, setDashboardError] = useState<string | null>(null);
 
   // Protect route
   useEffect(() => {
@@ -76,23 +77,33 @@ export default function SurveyRespondentPage() {
     if (!user) return;
     setLoadingData(true);
     try {
+      let hasError = false;
       const [activeList, doneList, newsList] = await Promise.all([
         surveysApi.mySurveys().catch((err) => {
           console.error("Failed to load active surveys", err);
+          hasError = true;
           return [];
         }),
         surveysApi.myCompletedSurveys().catch((err) => {
           console.error("Failed to load completed surveys", err);
+          hasError = true;
           return [];
         }),
         improvementsApi.list().catch((err) => {
           console.error("Failed to load improvements", err);
+          hasError = true;
           return [];
         }),
       ]);
       setSurveys((activeList as any[]) || []);
       setCompletedSurveys((doneList as any[]) || []);
       setImprovements((newsList as any[]) || []);
+
+      if (hasError) {
+        setDashboardError("Một số dữ liệu không thể tải được lúc này. Vui lòng thử lại sau.");
+      } else {
+        setDashboardError(null);
+      }
 
       try {
         const feedbacksList = await clarificationsApi.getStudentFeedbacks();
@@ -234,6 +245,16 @@ export default function SurveyRespondentPage() {
         {view === "list" ? (
           // ── Dashboard View ────────────────────────────────────────────────
           <div className="space-y-lg animate-in fade-in duration-300">
+            {/* Error Banner */}
+            {dashboardError && (
+              <div className="bg-warning/10 border border-warning/30 text-warning-dark rounded-xl p-md text-sm flex items-start gap-2">
+                <span className="material-symbols-outlined shrink-0" style={{ fontSize: '20px', lineHeight: '1.2' }}>
+                  warning
+                </span>
+                <p>{dashboardError}</p>
+              </div>
+            )}
+
             {/* Welcome */}
             <div className="bg-surface-container-lowest border border-outline-variant p-lg rounded-2xl shadow-sm relative overflow-hidden">
               <div className="absolute -top-12 -right-12 w-48 h-48 bg-primary rounded-full filter blur-[70px] opacity-15"></div>

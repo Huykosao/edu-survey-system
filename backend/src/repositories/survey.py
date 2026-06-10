@@ -59,36 +59,15 @@ def list_surveys_by_ids(survey_ids: list[int]) -> list[dict]:
     return result.data or []
 
 
-def list_responded_survey_ids(user_id: int) -> list[int]:
-    """Lấy danh sách survey_id mà user đã nộp phản hồi."""
+def list_responded_survey_ids(user_id: int) -> set[int]:
+    """Lấy tập hợp survey_id mà user đã nộp phản hồi."""
     result = (
         supabase_client.table("survey_participations")
         .select("survey_id")
         .eq("user_id", user_id)
         .execute()
     )
-    return list({row["survey_id"] for row in (result.data or [])})
-
-def check_participation(survey_id: int, user_id: int) -> bool:
-    """Kiểm tra user đã tham gia khảo sát chưa thông qua bảng survey_participations."""
-    result = (
-        supabase_client.table("survey_participations")
-        .select("id")
-        .eq("survey_id", survey_id)
-        .eq("user_id", user_id)
-        .execute()
-    )
-    return len(result.data) > 0
-
-def record_participation(survey_id: int, user_id: int) -> dict:
-    """Ghi nhận user đã tham gia khảo sát (để tránh nộp trùng)."""
-    result = supabase_client.table("survey_participations").insert({
-        "survey_id": survey_id,
-        "user_id": user_id
-    }).execute()
-    if not result.data:
-        raise HTTPException(status_code=500, detail="Ghi nhận tham gia thất bại")
-    return result.data[0]
+    return {row["survey_id"] for row in (result.data or [])}
 
 def submit_response_atomic(survey_id: int, user_id: int, subject_id: int | None, answers: dict, raw_content_text: str, is_anonymous: bool) -> dict:
     """Sử dụng RPC để submit response và record participation trong một transaction."""

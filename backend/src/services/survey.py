@@ -116,7 +116,7 @@ def get_completed_surveys_for_user(current_user: dict) -> list[dict]:
     if not responded_ids:
         return []
     # Tìm nạp trực tiếp bằng ID thay vì lọc trong bộ nhớ toàn bộ khảo sát published
-    return survey_repo.list_surveys_by_ids(responded_ids)
+    return survey_repo.list_surveys_by_ids(list(responded_ids))
 
 
 def duplicate_survey(survey_id: int, created_by: int) -> dict:
