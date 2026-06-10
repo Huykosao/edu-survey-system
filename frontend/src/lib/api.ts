@@ -193,11 +193,13 @@ export const authApi = {
 // User Management API (Admin)
 // =============================================================
 export const usersApi = {
-  list: (params?: { role?: string; status?: string; page?: number }) => {
+  list: (params?: { role?: string; status?: string; page?: number; limit?: number; search?: string }) => {
     const query = new URLSearchParams();
     if (params?.role) query.set("role", params.role);
     if (params?.status) query.set("status", params.status);
     if (params?.page) query.set("page", params.page.toString());
+    if (params?.limit) query.set("limit", params.limit.toString());
+    if (params?.search) query.set("search", params.search);
     const qs = query.toString();
     return apiFetch<{ data: Record<string, unknown>[]; total: number }>(
       `/api/users${qs ? `?${qs}` : ""}`,

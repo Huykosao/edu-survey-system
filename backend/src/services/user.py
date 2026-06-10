@@ -39,7 +39,7 @@ def sanitize_user(user: dict, roles: list[str]) -> dict:
     }
 
 
-def get_users_list(role_filter: str | None, status: str | None, page: int, limit: int) -> dict:
+def get_users_list(role_filter: str | None, status: str | None, page: int, limit: int, search: str | None = None) -> dict:
     """Lấy danh sách users có filter và phân trang."""
     user_ids = None
     if role_filter:
@@ -47,7 +47,7 @@ def get_users_list(role_filter: str | None, status: str | None, page: int, limit
         if not user_ids:
             return {"data": [], "total": 0}
 
-    users_raw, total = list_users(status, page, limit, user_ids=user_ids)
+    users_raw, total = list_users(status, page, limit, user_ids=user_ids, search=search)
 
     # N+1 query fix: fetch all roles in one query
     retrieved_user_ids = [u["id"] for u in users_raw]

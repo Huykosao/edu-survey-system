@@ -32,32 +32,21 @@ export default function UserManagementPage() {
   const ITEMS_PER_PAGE = 50;
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"grid" | "table" | "list">("grid");
-  const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
+  const [totalUsers, setTotalUsers] = useState(0);
 
-  const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.checked) {
-      setSelectedUsers(paginatedUsers.map(u => u.id));
-    } else {
-      setSelectedUsers([]);
-    }
-  };
+  // Debounced search query to prevent spamming requests
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
 
-  const handleSelectUser = (id: string) => {
-    if (selectedUsers.includes(id)) {
-      setSelectedUsers(selectedUsers.filter(uid => uid !== id));
-    } else {
-      setSelectedUsers([...selectedUsers, id]);
-    }
-  };
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 400);
+    return () => clearTimeout(handler);
+  }, [searchQuery]);
 
   useEffect(() => {
     setCurrentPage(1);
-    setSelectedUsers([]);
   }, [searchQuery, selectedRole, selectedStatus]);
-
-  useEffect(() => {
-    setSelectedUsers([]);
-  }, [currentPage, viewMode]);
 
   // Form states for new user
   const [newName, setNewName] = useState("");
@@ -75,7 +64,24 @@ export default function UserManagementPage() {
   const loadUsers = async () => {
     setLoading(true);
     try {
-      const res: any = await usersApi.list();
+      let apiRole = undefined;
+      if (selectedRole === "Quản trị viên") apiRole = "ADMIN";
+      else if (selectedRole === "Quản lý") apiRole = "MANAGER";
+      else if (selectedRole === "Giảng viên") apiRole = "LECTURER";
+      else if (selectedRole === "Sinh viên") apiRole = "STUDENT";
+
+      let apiStatus = undefined;
+      if (selectedStatus === "Hoạt động") apiStatus = "active";
+      else if (selectedStatus === "Tạm khóa") apiStatus = "inactive";
+
+      const res: any = await usersApi.list({
+        role: apiRole,
+        status: apiStatus,
+        page: currentPage,
+        limit: ITEMS_PER_PAGE,
+        search: debouncedSearchQuery || undefined,
+      });
+
       const mapped = (res.data || []).map((u: any) => {
         let role = "Sinh viên";
         if (u.roles && u.roles.length > 0) {
@@ -96,6 +102,7 @@ export default function UserManagementPage() {
         };
       });
       setUsers(mapped);
+      setTotalUsers(res.total || 0);
     } catch (err: any) {
       if (err?.message !== "Failed to fetch") {
         console.error("Error loading users:", err);
@@ -107,6 +114,9 @@ export default function UserManagementPage() {
 
   useEffect(() => {
     loadUsers();
+  }, [currentPage, debouncedSearchQuery, selectedRole, selectedStatus]);
+
+  useEffect(() => {
     facultiesApi.list().then((res: any) => setFaculties(res)).catch(() => { });
   }, []);
 
@@ -133,7 +143,7 @@ export default function UserManagementPage() {
     if (!confirm("Bạn có chắc chắn muốn xóa người dùng này?")) return;
     try {
       await usersApi.delete(parseInt(id));
-      setUsers(users.filter(u => u.id !== id));
+      loadUsers();
     } catch (err) {
       console.error("Error deleting user:", err);
       alert("Có lỗi xảy ra khi xóa người dùng.");
@@ -313,18 +323,8 @@ export default function UserManagementPage() {
     reader.readAsArrayBuffer(file);
   };
 
-  // Filter logic
-  const filteredUsers = users.filter((user) => {
-    const matchesSearch =
-      user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesRole = selectedRole === "" || user.role === selectedRole;
-    const matchesStatus = selectedStatus === "" || user.status === selectedStatus;
-    return matchesSearch && matchesRole && matchesStatus;
-  });
-
-  const totalPages = Math.max(1, Math.ceil(filteredUsers.length / ITEMS_PER_PAGE));
-  const paginatedUsers = filteredUsers.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+  const totalPages = Math.max(1, Math.ceil(totalUsers / ITEMS_PER_PAGE));
+  const paginatedUsers = users;
 
   return (
     <div className="flex flex-col gap-3 md:gap-lg animate-in fade-in duration-300 h-auto md:h-full min-h-0">
@@ -549,19 +549,11 @@ export default function UserManagementPage() {
       ) : viewMode === "table" ? (
         <div className="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden md:flex-1 md:min-h-0 flex flex-col shadow-sm">
           <div 
-            className="overflow-auto flex-grow px-3 pb-3"
+            className="overflow-auto flex-grow"
           >
             <table className="w-full border-separate border-spacing-0 text-left">
               <thead className="sticky top-0 z-10">
                 <tr className="h-11">
-                  <th className="px-4 w-12 text-center bg-surface-container-high border-b border-outline-variant h-11">
-                    <input 
-                      type="checkbox" 
-                      checked={paginatedUsers.length > 0 && paginatedUsers.every(u => selectedUsers.includes(u.id))}
-                      onChange={handleSelectAll}
-                      className="rounded border-outline-variant text-primary focus:ring-primary cursor-pointer w-4 h-4 animate-none" 
-                    />
-                  </th>
                   <th className="px-4 font-label-md text-label-md text-on-surface-variant font-bold bg-surface-container-high border-b border-outline-variant min-w-[200px] md:min-w-[280px] h-11">Người dùng</th>
                   <th className="px-4 font-label-md text-label-md text-on-surface-variant font-bold bg-surface-container-high border-b border-outline-variant w-32 md:w-40 h-11">Vai trò</th>
                   <th className="px-4 font-label-md text-label-md text-on-surface-variant font-bold bg-surface-container-high border-b border-outline-variant w-32 md:w-40 h-11">Trạng thái</th>
@@ -573,14 +565,6 @@ export default function UserManagementPage() {
                   const isLocked = user.status === "Tạm khóa";
                   return (
                     <tr key={user.id} className={`hover:bg-surface-container-low transition-colors ${isLocked ? "bg-surface-container-highest/20" : ""}`}>
-                      <td className="py-3 px-4 text-center border-b border-outline-variant/30">
-                        <input 
-                          type="checkbox" 
-                          checked={selectedUsers.includes(user.id)}
-                          onChange={() => handleSelectUser(user.id)}
-                          className="rounded border-outline-variant text-primary focus:ring-primary cursor-pointer w-4 h-4" 
-                        />
-                      </td>
                       <td className="py-3 px-4 border-b border-outline-variant/30">
                         <div className="flex items-center gap-3">
                           <div
@@ -747,7 +731,7 @@ export default function UserManagementPage() {
       {/* Pagination */}
       <div className="flex flex-col sm:flex-row justify-between items-center gap-2 sm:gap-0 pt-3 md:pt-md border-t border-outline-variant mt-2 md:mt-md flex-shrink-0">
         <p className="font-body-md text-[12px] md:text-label-sm text-on-surface-variant text-center sm:text-left">
-          Hiển thị {(currentPage - 1) * ITEMS_PER_PAGE + 1} - {Math.min(currentPage * ITEMS_PER_PAGE, filteredUsers.length)} trên {filteredUsers.length} người dùng
+          Hiển thị {(currentPage - 1) * ITEMS_PER_PAGE + 1} - {Math.min(currentPage * ITEMS_PER_PAGE, totalUsers)} trên {totalUsers} người dùng
         </p>
         <div className="flex gap-1.5 md:gap-2 items-center">
           <button 
