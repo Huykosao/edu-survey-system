@@ -53,6 +53,17 @@ def list_published_surveys() -> list[dict]:
     return result.data or []
 
 
+def list_responded_survey_ids(user_id: int) -> list[int]:
+    """Lấy danh sách survey_id mà user đã nộp phản hồi."""
+    result = (
+        supabase_client.table("survey_responses")
+        .select("survey_id")
+        .eq("user_id", user_id)
+        .execute()
+    )
+    return list({row["survey_id"] for row in (result.data or [])})
+
+
 # ── Survey Responses ──────────────────────────────────────────────────────────
 
 def create_response(resp_data: dict) -> dict:

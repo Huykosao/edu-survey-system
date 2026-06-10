@@ -76,10 +76,13 @@ export default function SurveyRespondentPage() {
     if (!user) return;
     setLoadingData(true);
     try {
-      const activeList = await surveysApi.mySurveys();
+      const [activeList, doneList, newsList] = await Promise.all([
+        surveysApi.mySurveys(),
+        surveysApi.myCompletedSurveys(),
+        improvementsApi.list(),
+      ]);
       setSurveys((activeList as any[]) || []);
-
-      const newsList = await improvementsApi.list();
+      setCompletedSurveys((doneList as any[]) || []);
       setImprovements((newsList as any[]) || []);
 
       try {
@@ -150,11 +153,9 @@ export default function SurveyRespondentPage() {
   const handleFinishAndReturn = () => {
     setShowSuccess(false);
     setView("list");
-    if (selectedSurvey) {
-      setSurveys((prev) => prev.filter((s) => s.id !== selectedSurvey.id));
-      setCompletedSurveys((prev) => [...prev, selectedSurvey]);
-    }
     setSelectedSurvey(null);
+    // Reload danh sách từ server để đảm bảo chính xác
+    loadDashboardData();
   };
 
   // ── Loading & Auth Guard ───────────────────────────────────────────────────
@@ -186,13 +187,13 @@ export default function SurveyRespondentPage() {
       <header className="bg-surface-container-lowest sticky top-0 z-30 shadow-sm border-b border-outline-variant/40">
         <div className="flex items-center justify-between w-full max-w-5xl mx-auto px-md h-16">
           <div className="flex items-center gap-sm">
-            <span className="material-symbols-outlined text-primary text-2xl font-bold">
+            <span className="material-symbols-outlined text-primary font-bold" style={{ fontSize: '24px', lineHeight: '1' }}>
               assignment
             </span>
-            <h1 className="font-headline-md text-headline-md text-primary font-bold hidden sm:block">
+            <h1 className="font-headline-md text-headline-md text-primary font-bold hidden sm:block leading-none">
               Cổng Khảo sát Độc lập
             </h1>
-            <h1 className="font-headline-md text-headline-md text-primary font-bold sm:hidden">
+            <h1 className="font-headline-md text-headline-md text-primary font-bold sm:hidden leading-none">
               Khảo sát
             </h1>
           </div>
@@ -210,10 +211,10 @@ export default function SurveyRespondentPage() {
               onClick={() => logout()}
               className="text-error border border-error/25 hover:bg-error-container/15 px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
             >
-              <span className="material-symbols-outlined text-[16px]">
+              <span className="material-symbols-outlined" style={{ fontSize: '16px', lineHeight: '1' }}>
                 logout
               </span>
-              Đăng xuất
+              <span className="leading-none">Đăng xuất</span>
             </button>
           </div>
         </div>
@@ -245,6 +246,11 @@ export default function SurveyRespondentPage() {
                   done: "Khảo sát đã hoàn thành",
                   improvements: "Bảng tin cải tiến",
                 };
+                const icons = {
+                  todo: "assignment",
+                  done: "task_alt",
+                  improvements: "campaign",
+                };
                 return (
                   <button
                     key={tab}
@@ -255,10 +261,18 @@ export default function SurveyRespondentPage() {
                         : "border-transparent text-on-surface-variant hover:text-on-surface"
                     }`}
                   >
-                    {labels[tab]}
+                    <span className="material-symbols-outlined" style={{ fontSize: '18px', lineHeight: '1' }}>
+                      {icons[tab]}
+                    </span>
+                    <span className="leading-none">{labels[tab]}</span>
                     {tab === "todo" && surveys.length > 0 && (
-                      <span className="bg-primary text-on-primary text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                      <span className="bg-primary text-on-primary text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">
                         {surveys.length}
+                      </span>
+                    )}
+                    {tab === "done" && completedSurveys.length > 0 && (
+                      <span className="bg-secondary text-on-secondary text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">
+                        {completedSurveys.length}
                       </span>
                     )}
                   </button>
@@ -269,21 +283,21 @@ export default function SurveyRespondentPage() {
             {/* Tab Content */}
             {loadingData ? (
               <div className="py-xl text-center flex flex-col items-center gap-md">
-                <span className="material-symbols-outlined text-4xl text-primary animate-spin">
+                <span className="material-symbols-outlined text-primary animate-spin" style={{ fontSize: '36px', lineHeight: '1' }}>
                   sync
                 </span>
-                <span className="text-body-md text-on-surface-variant">
+                <span className="text-body-md text-on-surface-variant leading-none">
                   Đang tải...
                 </span>
               </div>
             ) : activeTab === "todo" ? (
               <div className="space-y-md">
                 {surveys.length === 0 ? (
-                  <div className="py-xl text-center text-on-surface-variant font-body-md bg-surface-container-lowest rounded-xl border border-outline-variant p-lg shadow-inner">
-                    <span className="material-symbols-outlined text-5xl text-outline mb-sm block">
+                  <div className="py-xl text-center text-on-surface-variant font-body-md bg-surface-container-lowest rounded-xl border border-outline-variant p-lg shadow-inner flex flex-col items-center gap-sm">
+                    <span className="material-symbols-outlined text-outline" style={{ fontSize: '48px', lineHeight: '1' }}>
                       assignment_turned_in
                     </span>
-                    Bạn đã hoàn thành tất cả khảo sát kỳ này! Cảm ơn bạn.
+                    <span>Bạn đã hoàn thành tất cả khảo sát kỳ này! Cảm ơn bạn.</span>
                   </div>
                 ) : (
                   surveys.map((s) => (
@@ -320,11 +334,11 @@ export default function SurveyRespondentPage() {
             ) : activeTab === "done" ? (
               <div className="space-y-md">
                 {completedSurveys.length === 0 ? (
-                  <div className="py-xl text-center text-on-surface-variant font-body-md bg-surface-container-lowest rounded-xl border border-outline-variant p-lg">
-                    <span className="material-symbols-outlined text-4xl text-outline mb-sm block">
+                  <div className="py-xl text-center text-on-surface-variant font-body-md bg-surface-container-lowest rounded-xl border border-outline-variant p-lg flex flex-col items-center gap-sm">
+                    <span className="material-symbols-outlined text-outline" style={{ fontSize: '36px', lineHeight: '1' }}>
                       history
                     </span>
-                    Chưa có khảo sát nào được hoàn thành.
+                    <span>Chưa có khảo sát nào được hoàn thành.</span>
                   </div>
                 ) : (
                   completedSurveys.map((s) => (
@@ -341,10 +355,10 @@ export default function SurveyRespondentPage() {
                         </p>
                       </div>
                       <span className="text-emerald-700 font-bold text-xs flex items-center gap-1 shrink-0 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-100">
-                        <span className="material-symbols-outlined text-[16px] font-bold">
+                        <span className="material-symbols-outlined font-bold" style={{ fontSize: '16px', lineHeight: '1' }}>
                           verified
                         </span>
-                        Đã nộp bài
+                        <span className="leading-none">Đã nộp bài</span>
                       </span>
                     </div>
                   ))
@@ -355,10 +369,10 @@ export default function SurveyRespondentPage() {
               <div className="space-y-lg">
                 <div className="space-y-md">
                   <h3 className="font-label-md text-label-md font-bold text-primary uppercase tracking-wider flex items-center gap-1.5">
-                    <span className="material-symbols-outlined text-[20px]">
+                    <span className="material-symbols-outlined" style={{ fontSize: '20px', lineHeight: '1' }}>
                       campaign
                     </span>
-                    Thông báo Cải tiến từ Nhà trường
+                    <span className="leading-none">Thông báo Cải tiến từ Nhà trường</span>
                   </h3>
                   {improvements.length === 0 ? (
                     <div className="py-lg text-center text-on-surface-variant text-sm bg-surface-container rounded-xl p-md">
@@ -393,10 +407,10 @@ export default function SurveyRespondentPage() {
 
                 <div className="space-y-md border-t border-outline-variant/30 pt-lg mt-lg">
                   <h3 className="font-label-md text-label-md font-bold text-secondary uppercase tracking-wider flex items-center gap-1.5">
-                    <span className="material-symbols-outlined text-[20px]">
+                    <span className="material-symbols-outlined" style={{ fontSize: '20px', lineHeight: '1' }}>
                       chat_bubble
                     </span>
-                    Phản hồi &amp; Cam kết của Giảng viên
+                    <span className="leading-none">Phản hồi &amp; Cam kết của Giảng viên</span>
                   </h3>
                   {studentFeedbacks.length === 0 ? (
                     <div className="py-lg text-center text-on-surface-variant text-sm bg-surface-container rounded-xl p-md">
@@ -522,8 +536,8 @@ export default function SurveyRespondentPage() {
                 ))
               ) : (
                 /* Fallback nếu survey chưa có content */
-                <div className="py-xl text-center text-on-surface-variant bg-surface-container-lowest rounded-xl border border-outline-variant p-lg">
-                  <span className="material-symbols-outlined text-4xl text-outline mb-sm block">
+                <div className="py-xl text-center text-on-surface-variant bg-surface-container-lowest rounded-xl border border-outline-variant p-lg flex flex-col items-center gap-sm">
+                  <span className="material-symbols-outlined text-outline" style={{ fontSize: '36px', lineHeight: '1' }}>
                     warning
                   </span>
                   <p className="font-semibold">Khảo sát này chưa có câu hỏi.</p>
@@ -567,7 +581,7 @@ export default function SurveyRespondentPage() {
           ></div>
           <div className="relative bg-surface rounded-xl border border-outline-variant/30 shadow-2xl p-xl max-w-[480px] w-full flex flex-col gap-md text-center items-center z-10 animate-in fade-in zoom-in-95 duration-200">
             <div className="w-16 h-16 bg-emerald-100 text-emerald-800 rounded-full flex items-center justify-center shadow-inner mb-sm">
-              <span className="material-symbols-outlined text-4xl font-bold">
+              <span className="material-symbols-outlined font-bold" style={{ fontSize: '36px', lineHeight: '1' }}>
                 check_circle
               </span>
             </div>
