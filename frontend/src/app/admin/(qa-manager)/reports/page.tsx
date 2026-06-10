@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from "react";
 import { surveysApi } from "@/lib/api";
+import ExcelJS from "exceljs";
 import {
   BarChart,
   Bar,
@@ -292,6 +293,169 @@ export default function ReportsPage() {
     return { globalCSAT, csatPercentage, npsScore, totalCompleted };
   }, [analysis]);
 
+  const handleExportExcel = async () => {
+    if (!analysis || !selectedReport) return;
+
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet("Báo cáo phân tích", {
+      views: [{ showGridLines: false }], // Ẩn lưới mặc định cho chuyên nghiệp
+    });
+
+    // Định dạng cột
+    sheet.columns = [
+      { header: "", key: "cauSo", width: 15 },
+      { header: "", key: "noiDung", width: 90 }, // Tăng độ rộng cột Nội dung
+      { header: "", key: "loai", width: 18 },
+      { header: "", key: "val1", width: 18 },
+      { header: "", key: "val2", width: 18 },
+      { header: "", key: "val3", width: 18 },
+      { header: "", key: "val4", width: 18 },
+      { header: "", key: "val5", width: 18 },
+    ];
+
+    // Bật tự động xuống dòng (wrapText) cho toàn bộ cột nội dung
+    sheet.getColumn("noiDung").alignment = { wrapText: true, vertical: "middle" };
+
+    // --- TIÊU ĐỀ BÁO CÁO ---
+    sheet.mergeCells("A1:H1");
+    const titleCell = sheet.getCell("A1");
+    titleCell.value = `BÁO CÁO PHÂN TÍCH: ${selectedReport.title.toUpperCase()}`;
+    titleCell.font = { name: "Arial", size: 16, bold: true, color: { argb: "FFFFFFFF" } };
+    titleCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF00236F" } }; // Primary color
+    titleCell.alignment = { vertical: "middle", horizontal: "center" };
+    sheet.getRow(1).height = 40;
+
+    // --- TỔNG QUAN ---
+    sheet.mergeCells("A2:H2");
+    sheet.getCell("A2").value = "1. TỔNG QUAN CHIẾN DỊCH";
+    sheet.getCell("A2").font = { name: "Arial", size: 12, bold: true, color: { argb: "FF0058BE" } };
+    sheet.getCell("A2").fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF3F4F6" } };
+    sheet.getRow(2).height = 30;
+    sheet.getCell("A2").alignment = { vertical: "middle", horizontal: "left" };
+
+    sheet.addRow({ cauSo: "", noiDung: "Tổng số phản hồi", loai: analysis.total_responses });
+    sheet.addRow({ cauSo: "", noiDung: "CSAT (Hài lòng tổng thể)", loai: `${overviewStats?.globalCSAT}/5.0` });
+    sheet.addRow({ cauSo: "", noiDung: "NPS (Chỉ số trung thành)", loai: overviewStats?.npsScore });
+    
+    // Làm đậm cột B trong phần tổng quan
+    for (let i = 3; i <= 5; i++) {
+      sheet.getRow(i).getCell(2).font = { bold: true };
+    }
+
+    sheet.addRow([]); // Dòng trống
+    
+    // --- CHI TIẾT ---
+    sheet.mergeCells(`A7:H7`);
+    sheet.getCell("A7").value = "2. PHÂN TÍCH CHI TIẾT TỪNG CÂU HỎI";
+    sheet.getCell("A7").font = { name: "Arial", size: 12, bold: true, color: { argb: "FF0058BE" } };
+    sheet.getCell("A7").fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF3F4F6" } };
+    sheet.getRow(7).height = 30;
+    sheet.getCell("A7").alignment = { vertical: "middle", horizontal: "left" };
+
+    // Header của bảng chi tiết
+    const headerRow = sheet.addRow({
+      cauSo: "CÂU SỐ",
+      noiDung: "NỘI DUNG / THỐNG KÊ CHI TIẾT",
+      loai: "THỂ LOẠI",
+      val1: "GIÁ TRỊ 1",
+      val2: "GIÁ TRỊ 2",
+      val3: "GIÁ TRỊ 3",
+      val4: "GIÁ TRỊ 4",
+      val5: "GIÁ TRỊ 5",
+    });
+    
+    headerRow.eachCell((cell) => {
+      cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF757682" } };
+      cell.alignment = { vertical: "middle", horizontal: "center" };
+      cell.border = {
+        top: { style: "thin", color: { argb: "FFC5C5D3" } },
+        left: { style: "thin", color: { argb: "FFC5C5D3" } },
+        bottom: { style: "thin", color: { argb: "FFC5C5D3" } },
+        right: { style: "thin", color: { argb: "FFC5C5D3" } },
+      };
+    });
+
+    let idx = 1;
+    for (const [qId, qData] of Object.entries(analysis.analysis || {})) {
+      const q = qData as any;
+      
+      const qRow = sheet.addRow({
+        cauSo: `Câu ${idx++}`,
+        noiDung: q.question_label,
+        loai: q.question_type,
+      });
+      qRow.font = { bold: true };
+      qRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFEDEEF0" } };
+
+      if (q.question_type === "likert") {
+        sheet.addRow({
+          noiDung: "→ Điểm TB & Phân bổ (Mức 1 đến 5)",
+          val1: `TB: ${q.stats?.average}`,
+          val2: `Mức 1: ${q.stats?.distribution?.["1"] || 0}`,
+          val3: `Mức 2: ${q.stats?.distribution?.["2"] || 0}`,
+          val4: `Mức 3: ${q.stats?.distribution?.["3"] || 0}`,
+          val5: `Mức 4/5: ${(q.stats?.distribution?.["4"] || 0) + (q.stats?.distribution?.["5"] || 0)}`
+        });
+      } else if (q.question_type === "nps") {
+         sheet.addRow({
+          noiDung: "→ Điểm NPS & Phân bổ",
+          val1: `NPS: ${q.stats?.score}`,
+          val2: `Ủng hộ: ${q.stats?.distribution?.promoters || 0}`,
+          val3: `Thường: ${q.stats?.distribution?.passives || 0}`,
+          val4: `Phản đối: ${q.stats?.distribution?.detractors || 0}`,
+        });
+      } else if (q.question_type === "single_choice" || q.question_type === "multiple_choice") {
+        for (const [opt, count] of Object.entries(q.stats?.counts || {})) {
+          sheet.addRow({ noiDung: `   • ${opt}`, val1: `Chọn: ${count}` });
+        }
+      } else if (q.question_type === "matrix") {
+        for (const [rowLabel, rowDist] of Object.entries(q.stats?.rows_data || {})) {
+           const dist = rowDist as Record<string, number>;
+           const keys = Object.keys(dist);
+           sheet.addRow({
+             noiDung: `   • ${rowLabel}`,
+             val1: keys[0] ? `${keys[0]}: ${dist[keys[0]]}` : "",
+             val2: keys[1] ? `${keys[1]}: ${dist[keys[1]]}` : "",
+             val3: keys[2] ? `${keys[2]}: ${dist[keys[2]]}` : "",
+           });
+        }
+      } else if (q.question_type === "open_ended") {
+        sheet.addRow({ noiDung: "→ Phản hồi văn bản (Mẫu mới nhất):", val1: "Văn bản" });
+        (q.stats?.latest_samples || []).forEach((sample: string) => {
+          const row = sheet.addRow({ noiDung: `   - "${sample}"` });
+          row.getCell("noiDung").alignment = { wrapText: true };
+        });
+      }
+      // Dòng trống cách ly
+      sheet.addRow([]); 
+    }
+
+    // Đóng khung tất cả các ô có dữ liệu
+    sheet.eachRow((row, rowNumber) => {
+      if (rowNumber > 7) {
+        row.eachCell({ includeEmpty: false }, (cell) => {
+          cell.border = {
+            top: { style: "thin", color: { argb: "FFC5C5D3" } },
+            left: { style: "thin", color: { argb: "FFC5C5D3" } },
+            bottom: { style: "thin", color: { argb: "FFC5C5D3" } },
+            right: { style: "thin", color: { argb: "FFC5C5D3" } },
+          };
+        });
+      }
+    });
+
+    // Xuất file
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    const url = window.URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `BaoCao_Excel_${selectedReport.id}.xlsx`;
+    anchor.click();
+    window.URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="flex flex-col gap-lg animate-in fade-in duration-700 pb-12">
       {/* Page Header */}
@@ -370,11 +534,14 @@ export default function ReportsPage() {
                     </span>
                   </div>
                 </div>
-                <button className="px-6 py-3 bg-primary text-on-primary rounded-xl text-sm font-bold flex items-center justify-center gap-2 shadow-md hover:bg-primary-container hover:text-on-primary-container active:scale-95 transition-all cursor-pointer shrink-0">
+                <button
+                  onClick={handleExportExcel}
+                  className="px-6 py-3 bg-primary text-on-primary rounded-xl text-sm font-bold flex items-center justify-center gap-2 shadow-md hover:bg-primary-container hover:text-on-primary-container active:scale-95 transition-all cursor-pointer shrink-0"
+                >
                   <span className="material-symbols-outlined text-lg">
-                    picture_as_pdf
+                    table_chart
                   </span>
-                  Xuất Báo cáo
+                  Xuất Excel
                 </button>
               </div>
 
