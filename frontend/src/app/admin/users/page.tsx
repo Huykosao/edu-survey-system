@@ -45,10 +45,6 @@ export default function UserManagementPage() {
     return () => clearTimeout(handler);
   }, [searchQuery]);
 
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [selectedRole, selectedStatus]);
-
   // Form states for new user
   const [newName, setNewName] = useState("");
   const [newEmail, setNewEmail] = useState("");
@@ -84,6 +80,13 @@ export default function UserManagementPage() {
         limit: ITEMS_PER_PAGE,
         search: debouncedSearchQuery || undefined,
       });
+
+      // Redirect to the last valid page if the current page has no users but there are users elsewhere
+      if ((!res.data || res.data.length === 0) && res.total > 0 && currentPage > 1) {
+        const maxPage = Math.max(1, Math.ceil(res.total / ITEMS_PER_PAGE));
+        setCurrentPage(maxPage);
+        return;
+      }
 
       const mapped = (res.data || []).map((u: any) => {
         let role = "Sinh viên";
@@ -379,7 +382,10 @@ export default function UserManagementPage() {
           </div>
           <select
             value={selectedRole}
-            onChange={(e) => setSelectedRole(e.target.value)}
+            onChange={(e) => {
+              setSelectedRole(e.target.value);
+              setCurrentPage(1);
+            }}
             className="flex-1 md:flex-initial bg-surface border border-outline-variant text-on-surface font-body-md text-sm rounded-lg px-2.5 py-1.5 md:px-4 md:py-2 focus:outline-none focus:border-primary"
           >
             <option value="">Tất cả vai trò</option>
@@ -392,7 +398,10 @@ export default function UserManagementPage() {
           </select>
           <select
             value={selectedStatus}
-            onChange={(e) => setSelectedStatus(e.target.value)}
+            onChange={(e) => {
+              setSelectedStatus(e.target.value);
+              setCurrentPage(1);
+            }}
             className="flex-1 md:flex-initial bg-surface border border-outline-variant text-on-surface font-body-md text-sm rounded-lg px-2.5 py-1.5 md:px-4 md:py-2 focus:outline-none focus:border-primary"
           >
             <option value="">Tất cả trạng thái</option>
