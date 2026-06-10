@@ -402,7 +402,7 @@ export default function ReportsPage() {
           val2: `Mức 1: ${q.stats?.distribution?.["1"] || 0}`,
           val3: `Mức 2: ${q.stats?.distribution?.["2"] || 0}`,
           val4: `Mức 3: ${q.stats?.distribution?.["3"] || 0}`,
-          val5: `Mức 4/5: ${(q.stats?.distribution?.["4"] || 0) + (q.stats?.distribution?.["5"] || 0)}`
+          val5: "Mức 4/5: " + (Number(q.stats?.distribution?.["4"] || 0) + Number(q.stats?.distribution?.["5"] || 0))
         });
       } else if (q.question_type === "nps") {
          sheet.addRow({
