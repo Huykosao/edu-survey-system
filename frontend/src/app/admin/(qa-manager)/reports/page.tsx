@@ -320,40 +320,42 @@ export default function ReportsPage() {
     sheet.getColumn("noiDung").alignment = { wrapText: true, vertical: "middle" };
 
     // --- TIÊU ĐỀ BÁO CÁO ---
-    sheet.mergeCells("A1:H1");
-    const titleCell = sheet.getCell("A1");
-    titleCell.value = `BÁO CÁO PHÂN TÍCH: ${selectedReport.title.toUpperCase()}`;
+    const titleRow = sheet.addRow([`BÁO CÁO PHÂN TÍCH: ${selectedReport.title.toUpperCase()}`]);
+    sheet.mergeCells(titleRow.number, 1, titleRow.number, 8);
+    titleRow.height = 40;
+    const titleCell = titleRow.getCell(1);
     titleCell.font = { name: "Arial", size: 16, bold: true, color: { argb: "FFFFFFFF" } };
     titleCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF00236F" } }; // Primary color
     titleCell.alignment = { vertical: "middle", horizontal: "center" };
-    sheet.getRow(1).height = 40;
 
     // --- TỔNG QUAN ---
-    sheet.mergeCells("A2:H2");
-    sheet.getCell("A2").value = "1. TỔNG QUAN CHIẾN DỊCH";
-    sheet.getCell("A2").font = { name: "Arial", size: 12, bold: true, color: { argb: "FF0058BE" } };
-    sheet.getCell("A2").fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF3F4F6" } };
-    sheet.getRow(2).height = 30;
-    sheet.getCell("A2").alignment = { vertical: "middle", horizontal: "left" };
+    const overviewTitleRow = sheet.addRow(["1. TỔNG QUAN CHIẾN DỊCH"]);
+    sheet.mergeCells(overviewTitleRow.number, 1, overviewTitleRow.number, 8);
+    overviewTitleRow.height = 30;
+    const overviewTitleCell = overviewTitleRow.getCell(1);
+    overviewTitleCell.font = { name: "Arial", size: 12, bold: true, color: { argb: "FF0058BE" } };
+    overviewTitleCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF3F4F6" } };
+    overviewTitleCell.alignment = { vertical: "middle", horizontal: "left" };
 
-    sheet.addRow({ cauSo: "", noiDung: "Tổng số phản hồi", loai: analysis.total_responses ?? 0 });
-    sheet.addRow({ cauSo: "", noiDung: "CSAT (Hài lòng tổng thể)", loai: overviewStats?.globalCSAT ? `${overviewStats.globalCSAT}/5.0` : "Không áp dụng" });
-    sheet.addRow({ cauSo: "", noiDung: "NPS (Chỉ số trung thành)", loai: overviewStats?.npsScore ?? "Không áp dụng" });
+    const tr1 = sheet.addRow({ cauSo: "", noiDung: "Tổng số phản hồi", loai: analysis.total_responses ?? 0 });
+    const tr2 = sheet.addRow({ cauSo: "", noiDung: "CSAT (Hài lòng tổng thể)", loai: overviewStats?.globalCSAT ? `${overviewStats.globalCSAT}/5.0` : "Không áp dụng" });
+    const tr3 = sheet.addRow({ cauSo: "", noiDung: "NPS (Chỉ số trung thành)", loai: overviewStats?.npsScore ?? "Không áp dụng" });
     
-    // Làm đậm cột B trong phần tổng quan
-    for (let i = 3; i <= 5; i++) {
-      sheet.getRow(i).getCell(2).font = { bold: true };
-    }
+    // Làm đậm cột B trong phần tổng quan (động)
+    tr1.getCell(2).font = { bold: true };
+    tr2.getCell(2).font = { bold: true };
+    tr3.getCell(2).font = { bold: true };
 
     sheet.addRow([]); // Dòng trống
     
     // --- CHI TIẾT ---
-    sheet.mergeCells(`A7:H7`);
-    sheet.getCell("A7").value = "2. PHÂN TÍCH CHI TIẾT TỪNG CÂU HỎI";
-    sheet.getCell("A7").font = { name: "Arial", size: 12, bold: true, color: { argb: "FF0058BE" } };
-    sheet.getCell("A7").fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF3F4F6" } };
-    sheet.getRow(7).height = 30;
-    sheet.getCell("A7").alignment = { vertical: "middle", horizontal: "left" };
+    const detailsTitleRow = sheet.addRow(["2. PHÂN TÍCH CHI TIẾT TỪNG CÂU HỎI"]);
+    sheet.mergeCells(detailsTitleRow.number, 1, detailsTitleRow.number, 8);
+    detailsTitleRow.height = 30;
+    const detailsTitleCell = detailsTitleRow.getCell(1);
+    detailsTitleCell.font = { name: "Arial", size: 12, bold: true, color: { argb: "FF0058BE" } };
+    detailsTitleCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF3F4F6" } };
+    detailsTitleCell.alignment = { vertical: "middle", horizontal: "left" };
 
     // Header của bảng chi tiết
     const headerRow = sheet.addRow({
@@ -378,6 +380,8 @@ export default function ReportsPage() {
         right: { style: "thin", color: { argb: "FFC5C5D3" } },
       };
     });
+
+    const detailsStartRowNumber = headerRow.number; // Lưu lại để vẽ viền khung cho phần dưới
 
     let idx = 1;
     for (const [qId, qData] of Object.entries(analysis.analysis || {})) {
@@ -434,9 +438,9 @@ export default function ReportsPage() {
       sheet.addRow([]); 
     }
 
-    // Đóng khung tất cả các ô có dữ liệu
+    // Đóng khung tất cả các ô có dữ liệu ở phần chi tiết
     sheet.eachRow((row, rowNumber) => {
-      if (rowNumber > 7) {
+      if (rowNumber > detailsStartRowNumber) {
         row.eachCell({ includeEmpty: false }, (cell) => {
           cell.border = {
             top: { style: "thin", color: { argb: "FFC5C5D3" } },
