@@ -25,7 +25,7 @@ export default function AdminLayout({
   const hasLecturer = roles.includes("LECTURER");
 
   const adminOnlyPaths = ["/admin/users", "/admin/master-data", "/admin/permissions", "/admin/logs", "/admin/allowed-domains"];
-  const managerOnlyPaths = ["/admin/surveys", "/admin/clarifications", "/admin/approvals", "/admin/reports"];
+  const managerOnlyPaths = ["/admin/surveys", "/admin/clarifications", "/admin/approvals", "/admin/reports", "/admin/ai"];
   const lecturerOnlyPaths = ["/admin/my-clarifications"];
 
   const isTryingAdminPath = adminOnlyPaths.some(path => pathname === path || pathname?.startsWith(path + "/"));
@@ -139,6 +139,11 @@ export default function AdminLayout({
           name: "Báo cáo & Thống kê",
           path: "/admin/reports",
           icon: "analytics",
+        },
+        {
+          name: "Phân tích AI",
+          path: "/admin/ai",
+          icon: "psychology",
         },
       );
     }

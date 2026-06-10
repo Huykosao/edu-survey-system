@@ -97,6 +97,33 @@ def get_survey(survey_id: int) -> dict:
         raise HTTPException(status_code=404, detail="Không tìm thấy bài khảo sát")
     return survey
 
+def get_surveys_for_user(current_user: dict) -> list[dict]:
+    """Lấy danh sách khảo sát published mà user có thể làm."""
+    return survey_repo.list_published_surveys()
+
+
+def duplicate_survey(survey_id: int, created_by: int) -> dict:
+    """Nhân bản một khảo sát."""
+    original = get_survey(survey_id)
+    new_data = {
+        "title": f"{original['title']} (Bản sao)",
+        "description": original.get("description", ""),
+        "content": original.get("content", {}),
+        "status": "draft",
+        "is_anonymous": original.get("is_anonymous", True),
+        "target_config": original.get("target_config", {}),
+        "created_by": created_by,
+    }
+    return survey_repo.create_survey(new_data)
+
+
+def get_single_response(response_id: int) -> dict:
+    """Lấy chi tiết một phản hồi."""
+    resp = survey_repo.get_response_by_id(response_id)
+    if not resp:
+        raise HTTPException(status_code=404, detail="Không tìm thấy phản hồi")
+    return resp
+
 
 def create_new_survey(data: dict, created_by: int) -> dict:
     content_obj = _parse_content(data.get("content", {}))

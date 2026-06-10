@@ -151,7 +151,7 @@ def update_survey_stat(
 
 def list_responses_with_filters(survey_id: int, segment_type: str = "OVERALL", segment_value: str = "ALL") -> list[dict]:
     # Base query
-    query = supabase_client.table("survey_responses").select("*, users!inner(id, profile_details(*))").eq("survey_id", survey_id)
+    query = supabase_client.table("survey_responses").select("*").eq("survey_id", survey_id)
     
     # Lọc theo Môn học
     # Lọc theo Môn học
@@ -179,3 +179,107 @@ def delete_survey_stats(survey_id: int, segment_type: str = None, segment_value:
     if segment_value:
         query = query.eq("segment_value", segment_value)
     query.execute()
+
+def get_labels_by_role(role_name: str) -> list[dict]:
+    table_map = {
+        "STUDENT": "student_response_class",
+        "LECTURER": "teacher_response_class",
+        "EMPLOYER": "employer_response_class"
+    }
+    table_name = table_map.get(role_name.upper(), "student_response_class")
+    result = supabase_client.table(table_name).select("*").execute()
+    return result.data or []
+
+def get_responses_for_ai(survey_id: int) -> list[dict]:
+    result = (
+        supabase_client.table("survey_responses")
+        .select("id, raw_content_text")
+        .eq("survey_id", survey_id)
+        .not_.is_("raw_content_text", "null")
+        .execute()
+    )
+    return result.data or []
+
+def bulk_insert_response_labels(rows: list[dict]):
+    if not rows: return
+    return supabase_client.table("response_labels").insert(rows).execute()
+
+def get_survey_stats_data(survey_id: int) -> dict:
+    result = (
+        supabase_client.table("survey_stats")
+        .select("question_analysis")
+        .eq("survey_id", survey_id)
+        .eq("segment_type", "OVERALL")
+        .maybe_single()
+        .execute()
+    )
+    return result.data or {}
+
+def get_labeled_feedbacks_for_report(survey_id: int) -> list[dict]:
+    # RPC này cần join response_labels + survey_responses + bảng class tương ứng
+    result = supabase_client.rpc('get_labeled_feedbacks', {'p_survey_id': survey_id}).execute()
+    return result.data or []
+
+def insert_ai_report(survey_id: int, report_data: dict):
+    payload = {
+        "survey_id": survey_id,
+        "summary_text": report_data.get("executive_summary"),
+        "key_findings": report_data.get("detailed_trends"), # JSONB
+        "recommendations": report_data.get("overall_recommendation")
+    }
+    return supabase_client.table("survey_reports").insert(payload).execute()
+
+def get_open_responses_grouped_by_question(survey_id: int):
+    """
+    Lấy danh sách các câu trả lời mở, gom theo Question ID.
+    Cấu trúc trả về: { "q1": [{"res_id": 1, "text": "..."}, ...], "q2": [...] }
+    """
+    survey_data = supabase_client.table("surveys").select("content").eq("id", survey_id).single().execute().data
+    sections = survey_data.get("content", {}).get("sections", [])
+    
+    open_question_ids = []
+    question_map = {}
+    for sec in sections:
+        for q in sec.get("questions", []):
+            if q.get("type") == "open_ended":
+                open_question_ids.append(q.get("id"))
+                question_map[q.get("id")] = q.get("label")
+
+    responses = supabase_client.table("survey_responses").select("id, answers").eq("survey_id", survey_id).execute().data
+    
+    grouped_data = {}
+    for q_id in open_question_ids:
+        grouped_data[q_id] = {
+            "question_text": question_map[q_id],
+            "feedbacks": []
+        }
+        for r in responses:
+            answer_text = r.get("answers", {}).get(q_id)
+            if answer_text:
+                grouped_data[q_id]["feedbacks"].append({
+                    "res_id": r["id"],
+                    "text": answer_text
+                })
+    
+    return grouped_data
+
+def get_survey_structure(survey_id: int) -> dict | None:
+    """Lấy cấu trúc content và cấu hình mục tiêu của khảo sát (Dùng cho AI)"""
+    result = (
+        supabase_client.table("surveys")
+        .select("content, target_config")
+        .eq("id", survey_id)
+        .maybe_single()
+        .execute()
+    )
+    return result.data
+
+def get_all_responses_by_survey(survey_id: int) -> list[dict]:
+    """Lấy tất cả phản hồi của một khảo sát (Dùng cho AI)"""
+    result = (
+        supabase_client.table("survey_responses")
+        .select("id, answers")
+        .eq("survey_id", survey_id)
+        .execute()
+    )
+    return result.data or []
