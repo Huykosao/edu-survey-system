@@ -63,8 +63,8 @@ const LikertChart = ({ stats }: { stats: any }) => {
     }),
   );
   return (
-    <div className="h-[250px] w-full">
-      <ResponsiveContainer width="100%" height="100%">
+    <div className="w-full min-h-[250px]">
+      <ResponsiveContainer width="100%" height={250}>
         <BarChart data={chartData}>
           <CartesianGrid
             strokeDasharray="3 3"
@@ -113,8 +113,8 @@ const ChoiceChart = ({ stats }: { stats: any }) => {
     }),
   );
   return (
-    <div className="h-[250px] w-full">
-      <ResponsiveContainer width="100%" height="100%">
+    <div className="w-full min-h-[250px]">
+      <ResponsiveContainer width="100%" height={250}>
         <PieChart>
           <Pie
             data={chartData}
