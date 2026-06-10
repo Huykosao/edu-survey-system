@@ -110,8 +110,14 @@ def duplicate_survey(sid: int, current_user: dict = Depends(require_admin_or_man
 
 @router.get("/my-surveys", response_model=list[SurveyResponse])
 def get_my_surveys(current_user: dict = Depends(get_current_user)):
-    """Danh sách khảo sát đang phát hành."""
+    """Danh sách khảo sát đang phát hành mà user CHƯA làm."""
     return survey_svc.get_surveys_for_user(current_user)
+
+
+@router.get("/my-completed-surveys", response_model=list[SurveyResponse])
+def get_my_completed_surveys(current_user: dict = Depends(get_current_user)):
+    """Danh sách khảo sát mà user ĐÃ hoàn thành."""
+    return survey_svc.get_completed_surveys_for_user(current_user)
 
 
 @router.post("/surveys/{sid}/responses", response_model=SurveyResponseItem)

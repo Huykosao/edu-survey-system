@@ -52,6 +52,44 @@ def list_published_surveys() -> list[dict]:
     result = supabase_client.table("surveys").select("*").eq("status", "published").execute()
     return result.data or []
 
+def list_surveys_by_ids(survey_ids: list[int]) -> list[dict]:
+    if not survey_ids:
+        return []
+    result = supabase_client.table("surveys").select("*").in_("id", survey_ids).execute()
+    return result.data or []
+
+
+def list_responded_survey_ids(user_id: int) -> set[int]:
+    """Lấy tập hợp survey_id mà user đã nộp phản hồi."""
+    result = (
+        supabase_client.table("survey_participations")
+        .select("survey_id")
+        .eq("user_id", user_id)
+        .execute()
+    )
+    return {row["survey_id"] for row in (result.data or [])}
+
+def submit_response_atomic(survey_id: int, user_id: int, subject_id: int | None, answers: dict, raw_content_text: str, is_anonymous: bool) -> dict:
+    """Sử dụng RPC để submit response và record participation trong một transaction."""
+    try:
+        result = supabase_client.rpc('submit_survey_response_tx', {
+            'p_survey_id': survey_id,
+            'p_user_id': user_id,
+            'p_subject_id': subject_id,
+            'p_answers': answers,
+            'p_raw_content_text': raw_content_text,
+            'p_is_anonymous': is_anonymous
+        }).execute()
+        data = result.data
+        if isinstance(data, list) and len(data) > 0:
+            return data[0]
+        return data or {}
+    except Exception as e:
+        # Nếu Postgres throw unique constraint violation, RPC sẽ fail
+        if getattr(e, "code", None) == "23505" or "unique constraint" in str(e).lower() or "survey_participations" in str(e).lower():
+            raise HTTPException(status_code=400, detail="Bạn đã gửi phản hồi cho khảo sát này rồi.")
+        raise HTTPException(status_code=500, detail=f"Gửi phản hồi thất bại: {str(e)}")
+
 
 # ── Survey Responses ──────────────────────────────────────────────────────────
 

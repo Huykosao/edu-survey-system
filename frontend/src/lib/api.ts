@@ -384,6 +384,7 @@ export const surveysApi = {
   duplicate: (id: number) =>
     apiFetch(`/api/surveys/${id}/duplicate`, { method: "POST" }),
   mySurveys: () => apiFetch<Record<string, unknown>[]>("/api/my-surveys"),
+  myCompletedSurveys: () => apiFetch<Record<string, unknown>[]>("/api/my-completed-surveys"),
   getAnalysis: (
     id: number,
     params?: { segment_type?: string; segment_value?: string },

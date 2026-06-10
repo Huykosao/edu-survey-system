@@ -98,8 +98,25 @@ def get_survey(survey_id: int) -> dict:
     return survey
 
 def get_surveys_for_user(current_user: dict) -> list[dict]:
-    """Lấy danh sách khảo sát published mà user có thể làm."""
-    return survey_repo.list_published_surveys()
+    """Lấy danh sách khảo sát published mà user CHƯA làm."""
+    all_published = survey_repo.list_published_surveys()
+    user_id = current_user.get("id")
+    if not user_id:
+        return all_published
+    responded_ids = survey_repo.list_responded_survey_ids(user_id)
+    return [s for s in all_published if s["id"] not in responded_ids]
+
+
+def get_completed_surveys_for_user(current_user: dict) -> list[dict]:
+    """Lấy danh sách khảo sát mà user ĐÃ nộp phản hồi, bất kể trạng thái hiện tại (closed/draft/etc)."""
+    user_id = current_user.get("id")
+    if not user_id:
+        return []
+    responded_ids = survey_repo.list_responded_survey_ids(user_id)
+    if not responded_ids:
+        return []
+    # Tìm nạp trực tiếp bằng ID thay vì lọc trong bộ nhớ toàn bộ khảo sát published
+    return survey_repo.list_surveys_by_ids(list(responded_ids))
 
 
 def duplicate_survey(survey_id: int, created_by: int) -> dict:
@@ -151,32 +168,9 @@ def modify_survey(survey_id: int, data: dict) -> dict:
     return survey_repo.update_survey(survey_id, update_data)
 
 
-def get_surveys_for_user(current_user: dict) -> list[dict]:
-    """Lấy danh sách khảo sát published mà user có thể làm."""
-    return survey_repo.list_published_surveys()
+# (Duplicate definitions removed — see above for canonical versions)
 
 
-def duplicate_survey(survey_id: int, created_by: int) -> dict:
-    """Nhân bản một khảo sát."""
-    original = get_survey(survey_id)
-    new_data = {
-        "title": f"{original['title']} (Bản sao)",
-        "description": original.get("description", ""),
-        "content": original.get("content", {}),
-        "status": "draft",
-        "is_anonymous": original.get("is_anonymous", True),
-        "target_config": original.get("target_config", {}),
-        "created_by": created_by,
-    }
-    return survey_repo.create_survey(new_data)
-
-
-def get_single_response(response_id: int) -> dict:
-    """Lấy chi tiết một phản hồi."""
-    resp = survey_repo.get_response_by_id(response_id)
-    if not resp:
-        raise HTTPException(status_code=404, detail="Không tìm thấy phản hồi")
-    return resp
 
 
 # ── Survey Response & Analytics ───────────────────────────────────────────────
@@ -192,20 +186,17 @@ def submit_survey_response(survey_id: int, data: dict, user_id: int) -> dict:
     else:
         raw_text = data.get("raw_content_text", "")
 
-    # Check duplicate
-    if not survey.get("is_anonymous", True):
-        if survey_repo.get_my_response(survey_id, user_id):
-            raise HTTPException(status_code=400, detail="Bạn đã gửi phản hồi cho khảo sát này rồi.")
+    is_anonymous = survey.get("is_anonymous", True)
 
-    resp_data = {
-        "survey_id": survey_id,
-        "user_id": None if survey.get("is_anonymous", True) else user_id,
-        "subject_id": data.get("subject_id"),
-        "answers": answers,
-        "raw_content_text": raw_text,
-    }
-    
-    new_response = survey_repo.create_response(resp_data)
+    # Sử dụng RPC để thực hiện trong 1 transaction an toàn
+    new_response = survey_repo.submit_response_atomic(
+        survey_id=survey_id,
+        user_id=user_id,
+        subject_id=data.get("subject_id"),
+        answers=answers,
+        raw_content_text=raw_text,
+        is_anonymous=is_anonymous
+    )
 
     # CHIẾN LƯỢC: Cache Invalidation
     # Xóa thống kê cũ để lần gọi analysis tiếp theo sẽ tính toán lại dữ liệu mới nhất
