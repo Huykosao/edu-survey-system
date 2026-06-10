@@ -418,7 +418,7 @@ export default function ReportsPage() {
         }
       } else if (q.question_type === "matrix") {
         for (const [rowLabel, rowDist] of Object.entries(q.stats?.rows_data || {})) {
-           const dist = rowDist as Record<string, number>;
+           const dist = (rowDist || {}) as Record<string, number>;
            const keys = Object.keys(dist);
            sheet.addRow({
              noiDung: `   • ${rowLabel}`,
