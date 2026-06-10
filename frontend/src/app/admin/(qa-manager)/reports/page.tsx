@@ -433,7 +433,7 @@ export default function ReportsPage() {
         sheet.addRow({ noiDung: "→ Phản hồi văn bản (Mẫu mới nhất):", val1: "Văn bản" });
         (q.stats?.latest_samples || []).forEach((sample: string) => {
           const row = sheet.addRow({ noiDung: `   - "${sample}"` });
-          row.getCell("noiDung").alignment = { wrapText: true };
+          row.getCell(2).alignment = { wrapText: true };
         });
       }
       // Dòng trống cách ly
