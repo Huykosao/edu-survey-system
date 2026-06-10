@@ -200,7 +200,7 @@ export default function AdminLayout({
   };
 
   return (
-    <div className="bg-background text-on-surface min-h-screen flex flex-col font-body-md antialiased">
+    <div className="bg-background text-on-surface h-[100dvh] overflow-hidden flex flex-col font-body-md antialiased">
       {/* Top Header */}
       <header className="fixed top-0 left-0 right-0 h-16 bg-surface-container-lowest border-b border-outline-variant/50 flex items-center justify-between px-4 lg:px-6 z-50 backdrop-blur-md bg-surface-container-lowest/95">
         <div className="flex items-center gap-3">
@@ -328,7 +328,7 @@ export default function AdminLayout({
       </header>
 
       {/* Main Container */}
-      <div className="flex flex-1 pt-16 min-h-screen">
+      <div className="flex flex-1 pt-16 min-h-0">
         {/* Sidebar for Desktop */}
         <aside className="fixed left-0 top-16 bottom-0 w-[260px] bg-surface-container-lowest border-r border-outline-variant/30 hidden md:flex flex-col py-4 px-3 z-40">
           <nav className="flex-1 flex flex-col gap-1">
@@ -468,8 +468,8 @@ export default function AdminLayout({
         )}
 
         {/* Main Content Area */}
-        <main className="flex-1 md:ml-[260px] p-4 md:p-6 overflow-y-auto bg-background transition-all duration-200">
-          <div className="max-w-[1400px] mx-auto w-full">{children}</div>
+        <main className="flex-1 md:ml-[260px] p-4 md:p-6 overflow-y-auto bg-background transition-all duration-200 h-[calc(100dvh-4rem)]">
+          <div className="max-w-[1400px] mx-auto w-full h-full">{children}</div>
         </main>
       </div>
     </div>

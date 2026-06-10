@@ -37,13 +37,17 @@ def list_users(
     status: str | None, 
     page: int, 
     limit: int, 
-    user_ids: list[int] | None = None
+    user_ids: list[int] | None = None,
+    search: str | None = None
 ) -> tuple[list[dict], int]:
     query = supabase_client.table("users").select("*", count="exact")
     if status:
         query = query.eq("status", status)
     if user_ids is not None:
         query = query.in_("id", user_ids)
+    if search and search.strip():
+        escaped_search = search.strip().replace('\\', '\\\\').replace('"', '\\"').replace('%', '\\%').replace('_', '\\_')
+        query = query.or_(f'full_name.ilike."%{escaped_search}%",email.ilike."%{escaped_search}%"')
     offset = (page - 1) * limit
     result = query.range(offset, offset + limit - 1).order("created_at", desc=True).execute()
     return result.data or [], result.count or 0

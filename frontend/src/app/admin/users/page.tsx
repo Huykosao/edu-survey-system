@@ -9,7 +9,7 @@ interface User {
   id: string;
   name: string;
   email: string;
-  role: "Sinh viên" | "Giảng viên" | "Quản lý" | "Quản trị viên";
+  role: "Sinh viên" | "Giảng viên" | "Quản lý" | "Quản trị viên" | "Cựu sinh viên" | "Nhà tuyển dụng";
   status: "Hoạt động" | "Tạm khóa";
   avatarInitials: string;
 }
@@ -26,15 +26,24 @@ export default function UserManagementPage() {
   const [importErrors, setImportErrors] = useState<string[]>([]);
   const [importSelectedRole, setImportSelectedRole] = useState<"Sinh viên" | "Giảng viên" | "Quản lý" | "Quản trị viên" | "Cựu sinh viên" | "Nhà tuyển dụng">("Sinh viên");
   const [loading, setLoading] = useState(false);
-  
+
   // Pagination & Dropdown states
   const [currentPage, setCurrentPage] = useState(1);
-  const ITEMS_PER_PAGE = 8;
+  const ITEMS_PER_PAGE = 50;
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<"grid" | "table" | "list">("grid");
+  const [totalUsers, setTotalUsers] = useState(0);
+
+  // Debounced search query to prevent spamming requests
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
 
   useEffect(() => {
-    setCurrentPage(1);
-  }, [searchQuery, selectedRole, selectedStatus]);
+    const handler = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+      setCurrentPage(1);
+    }, 400);
+    return () => clearTimeout(handler);
+  }, [searchQuery]);
 
   // Form states for new user
   const [newName, setNewName] = useState("");
@@ -44,7 +53,7 @@ export default function UserManagementPage() {
   const [newFacultyId, setNewFacultyId] = useState<number | "">("");
   const [newRole, setNewRole] = useState<"Sinh viên" | "Giảng viên" | "Quản lý" | "Quản trị viên" | "Cựu sinh viên" | "Nhà tuyển dụng">("Sinh viên");
 
-  const [faculties, setFaculties] = useState<{id: number; name: string}[]>([]);
+  const [faculties, setFaculties] = useState<{ id: number; name: string }[]>([]);
 
   // Users Data
   const [users, setUsers] = useState<User[]>([]);
@@ -52,7 +61,33 @@ export default function UserManagementPage() {
   const loadUsers = async () => {
     setLoading(true);
     try {
-      const res: any = await usersApi.list();
+      let apiRole = undefined;
+      if (selectedRole === "Quản trị viên") apiRole = "ADMIN";
+      else if (selectedRole === "Quản lý") apiRole = "MANAGER";
+      else if (selectedRole === "Giảng viên") apiRole = "LECTURER";
+      else if (selectedRole === "Sinh viên") apiRole = "STUDENT";
+      else if (selectedRole === "Cựu sinh viên") apiRole = "ALUMNI";
+      else if (selectedRole === "Nhà tuyển dụng") apiRole = "EMPLOYER";
+
+      let apiStatus = undefined;
+      if (selectedStatus === "Hoạt động") apiStatus = "active";
+      else if (selectedStatus === "Tạm khóa") apiStatus = "inactive";
+
+      const res: any = await usersApi.list({
+        role: apiRole,
+        status: apiStatus,
+        page: currentPage,
+        limit: ITEMS_PER_PAGE,
+        search: debouncedSearchQuery.trim() || undefined,
+      });
+
+      // Redirect to the last valid page if the current page has no users but there are users elsewhere
+      if ((!res.data || res.data.length === 0) && res.total > 0 && currentPage > 1) {
+        const maxPage = Math.max(1, Math.ceil(res.total / ITEMS_PER_PAGE));
+        setCurrentPage(maxPage);
+        return;
+      }
+
       const mapped = (res.data || []).map((u: any) => {
         let role = "Sinh viên";
         if (u.roles && u.roles.length > 0) {
@@ -73,6 +108,7 @@ export default function UserManagementPage() {
         };
       });
       setUsers(mapped);
+      setTotalUsers(res.total || 0);
     } catch (err: any) {
       if (err?.message !== "Failed to fetch") {
         console.error("Error loading users:", err);
@@ -84,7 +120,10 @@ export default function UserManagementPage() {
 
   useEffect(() => {
     loadUsers();
-    facultiesApi.list().then((res: any) => setFaculties(res)).catch(() => {});
+  }, [currentPage, debouncedSearchQuery, selectedRole, selectedStatus]);
+
+  useEffect(() => {
+    facultiesApi.list().then((res: any) => setFaculties(res)).catch(() => { });
   }, []);
 
   const handleToggleLock = async (id: string) => {
@@ -110,7 +149,7 @@ export default function UserManagementPage() {
     if (!confirm("Bạn có chắc chắn muốn xóa người dùng này?")) return;
     try {
       await usersApi.delete(parseInt(id));
-      setUsers(users.filter(u => u.id !== id));
+      loadUsers();
     } catch (err) {
       console.error("Error deleting user:", err);
       alert("Có lỗi xảy ra khi xóa người dùng.");
@@ -267,7 +306,7 @@ export default function UserManagementPage() {
 
         setImportStatus("loading");
         const res: any = await usersApi.bulkCreate({ users: usersToCreate });
-        
+
         if (res.errors && res.errors.length > 0) {
           const backendErrors = res.errors.map((e: any) => `- ${e.email}: ${e.error}`);
           setImportErrors(backendErrors);
@@ -277,7 +316,7 @@ export default function UserManagementPage() {
           setImportMessage(`Đã tạo thành công toàn bộ ${usersToCreate.length} người dùng!`);
           setImportStatus("success");
         }
-        
+
         loadUsers();
       } catch (error: any) {
         console.error("Error parsing Excel file:", error);
@@ -290,51 +329,41 @@ export default function UserManagementPage() {
     reader.readAsArrayBuffer(file);
   };
 
-  // Filter logic
-  const filteredUsers = users.filter((user) => {
-    const matchesSearch =
-      user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesRole = selectedRole === "" || user.role === selectedRole;
-    const matchesStatus = selectedStatus === "" || user.status === selectedStatus;
-    return matchesSearch && matchesRole && matchesStatus;
-  });
-
-  const totalPages = Math.max(1, Math.ceil(filteredUsers.length / ITEMS_PER_PAGE));
-  const paginatedUsers = filteredUsers.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+  const totalPages = Math.max(1, Math.ceil(totalUsers / ITEMS_PER_PAGE));
+  const paginatedUsers = users;
 
   return (
-    <div className="flex flex-col gap-lg animate-in fade-in duration-300">
+    <div className="flex flex-col gap-3 md:gap-lg animate-in fade-in duration-300 h-auto md:h-full min-h-0">
       {/* Header Section */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-md border-b border-outline-variant/30 pb-md">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 md:gap-md border-b border-outline-variant/30 pb-2 md:pb-md">
         <div>
-          <h1 className="font-headline-lg text-headline-lg text-primary font-bold">Quản lý Người dùng</h1>
-          <p className="font-body-md text-body-md text-on-surface-variant mt-1">
+          <h1 className="text-xl md:text-headline-lg text-primary font-bold">Quản lý Người dùng</h1>
+          <p className="font-body-md text-body-md text-on-surface-variant mt-1 hidden md:block">
             Quản lý quyền truy cập hệ thống, vai trò phân quyền và trạng thái tài khoản của người dùng.
           </p>
         </div>
-        <div className="flex gap-sm self-start md:self-auto">
+        <div className="flex gap-2 self-start md:self-auto w-full md:w-auto">
           <button
             onClick={() => setShowImportModal(true)}
-            className="bg-surface-variant text-on-surface-variant px-4 py-3 rounded-lg font-label-md text-label-md flex items-center gap-2 hover:bg-surface-container-high transition-colors shadow-sm cursor-pointer"
+            className="flex-1 md:flex-initial bg-surface-variant text-on-surface-variant px-3 py-2 md:px-4 md:py-3 rounded-lg font-label-md text-label-md flex items-center justify-center gap-2 hover:bg-surface-container-high transition-colors shadow-sm cursor-pointer"
           >
             <span className="material-symbols-outlined text-[20px]">upload_file</span>
-            <span className="hidden sm:inline">Import Excel</span>
+            <span>Import Excel</span>
           </button>
           <button
             onClick={() => setShowAddModal(true)}
-            className="bg-primary text-on-primary px-4 py-3 rounded-lg font-label-md text-label-md flex items-center gap-2 hover:bg-primary-container hover:text-on-primary-container transition-colors shadow-sm cursor-pointer"
+            className="flex-1 md:flex-initial bg-primary text-on-primary px-3 py-2 md:px-4 md:py-3 rounded-lg font-label-md text-label-md flex items-center justify-center gap-2 hover:bg-primary-container hover:text-on-primary-container transition-colors shadow-sm cursor-pointer"
           >
             <span className="material-symbols-outlined text-[20px]">person_add</span>
-            <span className="hidden sm:inline">Thêm người dùng</span>
+            <span>Thêm mới</span>
           </button>
         </div>
       </div>
 
       {/* Filters & Search Toolbar */}
-      <div className="bg-surface-container-lowest p-md rounded-xl border border-outline-variant flex flex-col lg:flex-row gap-md items-center justify-between shadow-sm">
+      <div className="bg-surface-container-lowest p-2 md:p-md rounded-xl border border-outline-variant flex flex-col lg:flex-row gap-2 md:gap-md items-center justify-between shadow-sm">
         <div className="relative w-full lg:w-96 flex-shrink-0">
-          <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant">
+          <span className="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-on-surface-variant text-[20px]">
             search
           </span>
           <input
@@ -342,66 +371,109 @@ export default function UserManagementPage() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Tìm kiếm theo tên hoặc email..."
-            className="w-full pl-10 pr-4 py-2.5 bg-surface border border-outline-variant rounded-lg font-body-md text-body-md focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
+            className="w-full pl-9 pr-4 py-1.5 md:py-2.5 bg-surface border border-outline-variant rounded-lg font-body-md text-sm md:text-body-md focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
           />
         </div>
         
-        <div className="flex flex-wrap items-center gap-md w-full lg:w-auto">
-          <div className="flex items-center gap-2 text-on-surface-variant">
-            <span className="material-symbols-outlined text-[20px]">filter_list</span>
-            <span className="font-label-md text-label-md hidden sm:inline-block">Bộ lọc:</span>
+        <div className="flex flex-wrap items-center gap-2 md:gap-md w-full lg:w-auto">
+          <div className="flex items-center gap-1.5 text-on-surface-variant">
+            <span className="material-symbols-outlined text-[18px] md:text-[20px]">filter_list</span>
+            <span className="font-label-md text-sm md:text-label-md">Bộ lọc:</span>
           </div>
           <select
             value={selectedRole}
-            onChange={(e) => setSelectedRole(e.target.value)}
-            className="bg-surface border border-outline-variant text-on-surface font-body-md rounded-lg px-4 py-2 focus:outline-none focus:border-primary"
+            onChange={(e) => {
+              setSelectedRole(e.target.value);
+              setCurrentPage(1);
+            }}
+            className="flex-1 md:flex-initial bg-surface border border-outline-variant text-on-surface font-body-md text-sm rounded-lg px-2.5 py-1.5 md:px-4 md:py-2 focus:outline-none focus:border-primary"
           >
             <option value="">Tất cả vai trò</option>
             <option value="Sinh viên">Sinh viên</option>
             <option value="Giảng viên">Giảng viên</option>
             <option value="Quản lý">Quản lý</option>
             <option value="Quản trị viên">Quản trị viên</option>
+            <option value="Cựu sinh viên">Cựu sinh viên</option>
+            <option value="Nhà tuyển dụng">Nhà tuyển dụng</option>
           </select>
           <select
             value={selectedStatus}
-            onChange={(e) => setSelectedStatus(e.target.value)}
-            className="bg-surface border border-outline-variant text-on-surface font-body-md rounded-lg px-4 py-2 focus:outline-none focus:border-primary"
+            onChange={(e) => {
+              setSelectedStatus(e.target.value);
+              setCurrentPage(1);
+            }}
+            className="flex-1 md:flex-initial bg-surface border border-outline-variant text-on-surface font-body-md text-sm rounded-lg px-2.5 py-1.5 md:px-4 md:py-2 focus:outline-none focus:border-primary"
           >
             <option value="">Tất cả trạng thái</option>
             <option value="Hoạt động">Hoạt động</option>
             <option value="Tạm khóa">Tạm khóa</option>
           </select>
+
+          {/* View Mode Switcher */}
+          <div className="h-6 w-px bg-outline-variant/40 mx-1 hidden sm:block"></div>
+          <div className="flex border border-outline-variant rounded-lg overflow-hidden bg-surface flex-shrink-0 w-full sm:w-auto justify-center">
+            <button
+              type="button"
+              onClick={() => setViewMode("grid")}
+              className={`flex-1 sm:flex-initial px-3 py-1.5 flex items-center justify-center transition-colors cursor-pointer ${
+                viewMode === "grid" ? "bg-primary text-on-primary" : "text-on-surface-variant hover:bg-surface-container"
+              }`}
+              title="Dạng lưới"
+            >
+              <span className="material-symbols-outlined text-[18px] md:text-[20px]">grid_view</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode("table")}
+              className={`flex-1 sm:flex-initial px-3 py-1.5 flex items-center justify-center transition-colors border-l border-outline-variant cursor-pointer ${
+                viewMode === "table" ? "bg-primary text-on-primary" : "text-on-surface-variant hover:bg-surface-container"
+              }`}
+              title="Dạng bảng"
+            >
+              <span className="material-symbols-outlined text-[18px] md:text-[20px]">table_chart</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode("list")}
+              className={`flex-1 sm:flex-initial px-3 py-1.5 flex items-center justify-center transition-colors border-l border-outline-variant cursor-pointer ${
+                viewMode === "list" ? "bg-primary text-on-primary" : "text-on-surface-variant hover:bg-surface-container"
+              }`}
+              title="Dạng danh sách"
+            >
+              <span className="material-symbols-outlined text-[18px] md:text-[20px]">view_list</span>
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Bento Grid / Role Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-lg">
-          {loading ? (
-            <div className="col-span-full py-20 flex justify-center items-center text-primary">
-              <span className="material-symbols-outlined animate-spin text-4xl mr-3">sync</span>
-              Đang tải danh sách người dùng...
-            </div>
-          ) : paginatedUsers.length === 0 ? (
-          <div className="col-span-full py-xl text-center text-on-surface-variant font-body-md">
-            Không tìm thấy người dùng nào khớp với bộ lọc.
-            </div>
-          ) : (
-            paginatedUsers.map((user) => {
-              const isLocked = user.status === "Tạm khóa";
+      {loading ? (
+        <div className="flex-1 min-h-[300px] flex flex-col justify-center items-center text-primary bg-surface-container-lowest border border-outline-variant rounded-xl shadow-sm">
+          <span className="material-symbols-outlined animate-spin text-4xl mb-3">sync</span>
+          <span className="font-body-md">Đang tải danh sách người dùng...</span>
+        </div>
+      ) : paginatedUsers.length === 0 ? (
+        <div className="flex-1 min-h-[300px] flex flex-col justify-center items-center text-on-surface-variant font-body-md bg-surface-container-lowest border border-outline-variant rounded-xl shadow-sm">
+          <span className="material-symbols-outlined text-4xl mb-2">person_off</span>
+          <span>Không tìm thấy người dùng nào khớp với bộ lọc.</span>
+        </div>
+      ) : viewMode === "grid" ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 items-stretch content-start gap-3 md:flex-1 md:min-h-0 md:overflow-y-auto overflow-visible pr-1">
+          {paginatedUsers.map((user) => {
+            const isLocked = user.status === "Tạm khóa";
             return (
               <div
                 key={user.id}
-                className={`rounded-xl p-lg hover:shadow-[0_4px_12px_rgba(0,0,0,0.05)] transition-all duration-200 flex flex-col h-full relative bg-surface-container-lowest border ${
+                className={`rounded-lg p-3 lg:p-4 hover:shadow-[0_4px_12px_rgba(0,0,0,0.05)] transition-all duration-200 flex flex-col justify-between gap-3 lg:gap-4 relative bg-surface-container-lowest border ${
                   isLocked ? "border-error-container" : "border-outline-variant"
                 } ${openDropdown === user.id ? "z-50" : "z-0"}`}
               >
                 {/* Locked overlay effect */}
-                {isLocked && <div className="absolute inset-0 bg-surface-container-highest opacity-25 pointer-events-none z-0 rounded-xl"></div>}
+                {isLocked && <div className="absolute inset-0 bg-surface-container-highest opacity-25 pointer-events-none z-0 rounded-lg"></div>}
 
-                <div className={`flex justify-between items-start mb-md relative ${openDropdown === user.id ? "z-30" : "z-10"}`}>
-                  <div className="flex items-center gap-md">
+                <div className={`flex justify-between items-center mb-2 lg:mb-3 relative ${openDropdown === user.id ? "z-30" : "z-10"}`}>
+                  <div className="flex items-center gap-3 lg:gap-4 min-w-0">
                     <div
-                      className={`w-12 h-12 rounded-full flex items-center justify-center font-headline-md font-bold text-lg border ${
+                      className={`w-10 h-10 lg:w-14 lg:h-14 rounded-full flex items-center justify-center font-bold text-sm lg:text-lg border flex-shrink-0 transition-all duration-200 ${
                         isLocked
                           ? "bg-surface-variant text-on-surface-variant border-outline"
                           : user.role === "Giảng viên"
@@ -413,17 +485,17 @@ export default function UserManagementPage() {
                     >
                       {user.avatarInitials}
                     </div>
-                    <div>
-                      <h3 className="font-label-md text-label-md font-bold text-on-surface text-base">{user.name}</h3>
-                      <p className="font-body-md text-label-sm text-on-surface-variant">{user.email}</p>
+                    <div className="min-w-0">
+                      <h3 className="font-label-md text-label-md font-bold text-on-surface text-sm lg:text-base truncate leading-snug">{user.name}</h3>
+                      <p className="font-body-md text-[12px] lg:text-sm text-on-surface-variant truncate leading-normal mt-0.5">{user.email}</p>
                     </div>
                   </div>
-                  <div className="relative">
+                  <div className="relative flex-shrink-0">
                     <button 
                       onClick={() => setOpenDropdown(openDropdown === user.id ? null : user.id)}
-                      className="text-on-surface-variant hover:text-primary transition-colors cursor-pointer p-1 rounded-full hover:bg-surface-container relative z-10"
+                      className="text-on-surface-variant hover:text-primary transition-colors cursor-pointer p-0.5 rounded-full hover:bg-surface-container relative z-10"
                     >
-                      <span className="material-symbols-outlined">more_vert</span>
+                      <span className="material-symbols-outlined text-[20px] lg:text-[24px]">more_vert</span>
                     </button>
                     {openDropdown === user.id && (
                       <>
@@ -431,15 +503,15 @@ export default function UserManagementPage() {
                           className="fixed inset-0 z-40" 
                           onClick={() => setOpenDropdown(null)}
                         ></div>
-                        <div className="absolute right-0 mt-1 w-48 bg-surface rounded-lg shadow-lg border border-outline-variant py-1 z-50">
+                        <div className="absolute right-0 mt-1 w-44 bg-surface rounded-lg shadow-lg border border-outline-variant py-1 z-50">
                           <button
                             onClick={() => {
                               setOpenDropdown(null);
                               router.push(`/admin/users/edit?id=${user.id}`);
                             }}
-                            className="w-full text-left px-4 py-2.5 text-label-md hover:bg-surface-container flex items-center gap-3 transition-colors cursor-pointer relative z-50"
+                            className="w-full text-left px-3 py-2 text-label-md text-sm hover:bg-surface-container flex items-center gap-2.5 transition-colors cursor-pointer relative z-50"
                           >
-                            <span className="material-symbols-outlined text-[18px]">edit</span>
+                            <span className="material-symbols-outlined text-[16px]">edit</span>
                             Chỉnh sửa
                           </button>
                           <button 
@@ -447,9 +519,9 @@ export default function UserManagementPage() {
                               setOpenDropdown(null);
                               handleToggleLock(user.id);
                             }}
-                            className="w-full text-left px-4 py-2.5 text-label-md hover:bg-surface-container flex items-center gap-3 transition-colors cursor-pointer relative z-50"
+                            className="w-full text-left px-3 py-2 text-label-md text-sm hover:bg-surface-container flex items-center gap-2.5 transition-colors cursor-pointer relative z-50"
                           >
-                            <span className="material-symbols-outlined text-[18px]">{isLocked ? "lock_open" : "lock"}</span>
+                            <span className="material-symbols-outlined text-[16px]">{isLocked ? "lock_open" : "lock"}</span>
                             {isLocked ? "Mở khóa" : "Khóa tài khoản"}
                           </button>
                           <button 
@@ -457,9 +529,9 @@ export default function UserManagementPage() {
                               setOpenDropdown(null);
                               handleDeleteUser(user.id);
                             }}
-                            className="w-full text-left px-4 py-2.5 text-label-md text-error hover:bg-error-container/20 flex items-center gap-3 transition-colors cursor-pointer relative z-50"
+                            className="w-full text-left px-3 py-2 text-label-md text-sm text-error hover:bg-error-container/20 flex items-center gap-2.5 transition-colors cursor-pointer relative z-50"
                           >
-                            <span className="material-symbols-outlined text-[18px]">delete</span>
+                            <span className="material-symbols-outlined text-[16px]">delete</span>
                             Xóa người dùng
                           </button>
                         </div>
@@ -468,47 +540,227 @@ export default function UserManagementPage() {
                   </div>
                 </div>
 
-                <div className="flex gap-sm mb-lg mt-auto relative z-10">
-                  <span className="px-3 py-1 rounded-full bg-surface-container-high text-on-surface font-label-sm text-label-sm border border-outline-variant">
+                <div className="flex gap-1.5 lg:gap-2 mt-1 lg:mt-2 relative z-10">
+                  <span className="px-2 py-0.5 lg:px-3 lg:py-1 rounded-full bg-surface-container-high text-on-surface font-label-sm text-[11px] lg:text-xs border border-outline-variant">
                     {user.role}
                   </span>
                   {isLocked ? (
-                    <span className="px-3 py-1 rounded-full bg-error-container text-on-error-container font-label-sm text-label-sm flex items-center gap-1">
-                      <span className="material-symbols-outlined text-[14px]">lock</span>
+                    <span className="px-2 py-0.5 lg:px-3 lg:py-1 rounded-full bg-error-container text-on-error-container font-label-sm text-[11px] lg:text-xs flex items-center gap-1">
+                      <span className="material-symbols-outlined text-[12px] lg:text-[14px]">lock</span>
                       Tạm khóa
                     </span>
                   ) : (
-                    <span className="px-3 py-1 rounded-full bg-[#dcfce7] text-[#166534] font-label-sm text-label-sm flex items-center gap-1">
-                      <span className="w-2 h-2 rounded-full bg-[#166534]"></span>
+                    <span className="px-2 py-0.5 lg:px-3 lg:py-1 rounded-full bg-[#dcfce7] text-[#166534] font-label-sm text-[11px] lg:text-xs flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#166534]"></span>
                       Hoạt động
                     </span>
                   )}
                 </div>
               </div>
             );
-          })
-        )}
-      </div>
+          })}
+        </div>
+      ) : viewMode === "table" ? (
+        <div className="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden md:flex-1 md:min-h-0 flex flex-col shadow-sm">
+          <div 
+            className="overflow-auto flex-grow"
+          >
+            <table className="w-full border-separate border-spacing-0 text-left">
+              <thead className="sticky top-0 z-10">
+                <tr className="h-11">
+                  <th className="px-4 font-label-md text-label-md text-on-surface-variant font-bold bg-surface-container-high border-b border-outline-variant min-w-[200px] md:min-w-[280px] h-11">Người dùng</th>
+                  <th className="px-4 font-label-md text-label-md text-on-surface-variant font-bold bg-surface-container-high border-b border-outline-variant w-32 md:w-40 h-11">Vai trò</th>
+                  <th className="px-4 font-label-md text-label-md text-on-surface-variant font-bold bg-surface-container-high border-b border-outline-variant w-32 md:w-40 h-11">Trạng thái</th>
+                  <th className="px-4 font-label-md text-label-md text-on-surface-variant font-bold text-right bg-surface-container-high border-b border-outline-variant w-28 md:w-36 pr-6 h-11">Hành động</th>
+                </tr>
+              </thead>
+              <tbody>
+                {paginatedUsers.map((user) => {
+                  const isLocked = user.status === "Tạm khóa";
+                  return (
+                    <tr key={user.id} className={`hover:bg-surface-container-low transition-colors ${isLocked ? "bg-surface-container-highest/20" : ""}`}>
+                      <td className="py-3 px-4 border-b border-outline-variant/30">
+                        <div className="flex items-center gap-3">
+                          <div
+                            className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs border flex-shrink-0 ${
+                              isLocked
+                                ? "bg-surface-variant text-on-surface-variant border-outline"
+                                : user.role === "Giảng viên"
+                                ? "bg-primary-fixed text-on-primary-fixed border-transparent"
+                                : user.role === "Quản lý"
+                                ? "bg-tertiary-fixed text-on-tertiary-fixed border-transparent"
+                                : "bg-secondary-fixed text-on-secondary-fixed border-transparent"
+                            }`}
+                          >
+                            {user.avatarInitials}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="font-label-md text-label-md font-bold text-on-surface text-sm truncate">{user.name}</p>
+                            <p className="text-[12px] text-on-surface-variant truncate">{user.email}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="py-3 px-4 whitespace-nowrap border-b border-outline-variant/30">
+                        <span className="px-2 py-0.5 rounded-full bg-surface-container-high text-on-surface font-label-sm text-[11px] border border-outline-variant">
+                          {user.role}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 whitespace-nowrap border-b border-outline-variant/30">
+                        {isLocked ? (
+                          <span className="px-2 py-0.5 rounded-full bg-error-container text-on-error-container font-label-sm text-[11px] inline-flex items-center gap-1">
+                            <span className="material-symbols-outlined text-[12px]">lock</span>
+                            Tạm khóa
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded-full bg-[#dcfce7] text-[#166534] font-label-sm text-[11px] inline-flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-[#166534]"></span>
+                            Hoạt động
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-3 px-4 text-right whitespace-nowrap border-b border-outline-variant/30 pr-6">
+                        <div className="inline-flex gap-1">
+                          <button
+                            onClick={() => router.push(`/admin/users/edit?id=${user.id}`)}
+                            className="p-1 text-on-surface-variant hover:text-primary hover:bg-surface-container-high rounded transition-colors cursor-pointer"
+                            title="Chỉnh sửa"
+                          >
+                            <span className="material-symbols-outlined text-[18px]">edit</span>
+                          </button>
+                          <button
+                            onClick={() => handleToggleLock(user.id)}
+                            className="p-1 text-on-surface-variant hover:text-primary hover:bg-surface-container-high rounded transition-colors cursor-pointer"
+                            title={isLocked ? "Mở khóa" : "Khóa tài khoản"}
+                          >
+                            <span className="material-symbols-outlined text-[18px]">{isLocked ? "lock_open" : "lock"}</span>
+                          </button>
+                          <button
+                            onClick={() => handleDeleteUser(user.id)}
+                            className="p-1 text-error hover:bg-error-container/20 rounded transition-colors cursor-pointer"
+                            title="Xóa"
+                          >
+                            <span className="material-symbols-outlined text-[18px]">delete</span>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : (
+        <div className="bg-surface-container-lowest border border-outline-variant rounded-xl divide-y divide-outline-variant/30 md:flex-1 md:min-h-0 md:overflow-y-auto overflow-visible shadow-sm">
+          {paginatedUsers.map((user) => {
+            const isLocked = user.status === "Tạm khóa";
+            return (
+              <div key={user.id} className={`flex items-center justify-between p-3 hover:bg-surface-container-low transition-all ${isLocked ? "bg-surface-container-highest/10" : ""}`}>
+                <div className="flex items-center gap-3 min-w-0">
+                  <div
+                    className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs border flex-shrink-0 ${
+                      isLocked
+                        ? "bg-surface-variant text-on-surface-variant border-outline"
+                        : user.role === "Giảng viên"
+                        ? "bg-primary-fixed text-on-primary-fixed border-transparent"
+                        : user.role === "Quản lý"
+                        ? "bg-tertiary-fixed text-on-tertiary-fixed border-transparent"
+                        : "bg-secondary-fixed text-on-secondary-fixed border-transparent"
+                    }`}
+                  >
+                    {user.avatarInitials}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-label-md text-label-md font-bold text-on-surface text-sm truncate">{user.name}</p>
+                    <p className="text-[12px] text-on-surface-variant truncate">{user.email}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 md:gap-3 flex-shrink-0">
+                  <span className="px-2 py-0.5 rounded-full bg-surface-container-high text-on-surface font-label-sm text-[11px] border border-outline-variant">
+                    {user.role}
+                  </span>
+                  {isLocked ? (
+                    <span className="px-2 py-0.5 rounded-full bg-error-container text-on-error-container font-label-sm text-[11px] flex items-center gap-1">
+                      <span className="material-symbols-outlined text-[12px]">lock</span>
+                      Tạm khóa
+                    </span>
+                  ) : (
+                    <span className="px-2 py-0.5 rounded-full bg-[#dcfce7] text-[#166534] font-label-sm text-[11px] flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#166534]"></span>
+                      Hoạt động
+                    </span>
+                  )}
+                  <div className="relative">
+                    <button
+                      onClick={() => setOpenDropdown(openDropdown === user.id ? null : user.id)}
+                      className="text-on-surface-variant hover:text-primary transition-colors cursor-pointer p-1 rounded-full hover:bg-surface-container relative z-10"
+                    >
+                      <span className="material-symbols-outlined text-[20px]">more_vert</span>
+                    </button>
+                    {openDropdown === user.id && (
+                      <>
+                        <div className="fixed inset-0 z-40" onClick={() => setOpenDropdown(null)}></div>
+                        <div className="absolute right-0 mt-1 w-44 bg-surface rounded-lg shadow-lg border border-outline-variant py-1 z-50">
+                          <button
+                            onClick={() => {
+                              setOpenDropdown(null);
+                              router.push(`/admin/users/edit?id=${user.id}`);
+                            }}
+                            className="w-full text-left px-3 py-2 text-label-md text-sm hover:bg-surface-container flex items-center gap-2.5 transition-colors cursor-pointer relative z-50"
+                          >
+                            <span className="material-symbols-outlined text-[16px]">edit</span>
+                            Chỉnh sửa
+                          </button>
+                          <button
+                            onClick={() => {
+                              setOpenDropdown(null);
+                              handleToggleLock(user.id);
+                            }}
+                            className="w-full text-left px-3 py-2 text-label-md text-sm hover:bg-surface-container flex items-center gap-2.5 transition-colors cursor-pointer relative z-50"
+                          >
+                            <span className="material-symbols-outlined text-[16px]">{isLocked ? "lock_open" : "lock"}</span>
+                            {isLocked ? "Mở khóa" : "Khóa tài khoản"}
+                          </button>
+                          <button
+                            onClick={() => {
+                              setOpenDropdown(null);
+                              handleDeleteUser(user.id);
+                            }}
+                            className="w-full text-left px-3 py-2 text-label-md text-sm text-error hover:bg-error-container/20 flex items-center gap-2.5 transition-colors cursor-pointer relative z-50"
+                          >
+                            <span className="material-symbols-outlined text-[16px]">delete</span>
+                            Xóa người dùng
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* Pagination */}
-      <div className="flex justify-between items-center pt-md border-t border-outline-variant mt-md">
-        <p className="font-body-md text-label-sm text-on-surface-variant">
-          Hiển thị {(currentPage - 1) * ITEMS_PER_PAGE + 1} - {Math.min(currentPage * ITEMS_PER_PAGE, filteredUsers.length)} trên {filteredUsers.length} người dùng
+      <div className="flex flex-col sm:flex-row justify-between items-center gap-2 sm:gap-0 pt-3 md:pt-md border-t border-outline-variant mt-2 md:mt-md flex-shrink-0">
+        <p className="font-body-md text-[12px] md:text-label-sm text-on-surface-variant text-center sm:text-left">
+          Hiển thị {(currentPage - 1) * ITEMS_PER_PAGE + 1} - {Math.min(currentPage * ITEMS_PER_PAGE, totalUsers)} trên {totalUsers} người dùng
         </p>
-        <div className="flex gap-2 items-center">
+        <div className="flex gap-1.5 md:gap-2 items-center">
           <button 
             onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
             disabled={currentPage === 1}
-            className="px-3 py-1 rounded border border-outline-variant text-on-surface-variant disabled:opacity-50 cursor-pointer hover:bg-surface-container transition-colors"
+            className="px-2.5 py-1 text-sm md:px-3 md:py-1 rounded border border-outline-variant text-on-surface-variant disabled:opacity-50 cursor-pointer hover:bg-surface-container transition-colors"
           >
             Trước
           </button>
           
-          <span className="font-label-md px-2 text-on-surface">
+          <span className="text-sm md:text-label-md px-1 md:px-2 text-on-surface">
             Trang {currentPage} / {totalPages}
           </span>
-          
-          <button 
+
+          <button
             onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
             disabled={currentPage === totalPages}
             className="px-3 py-1 rounded border border-outline-variant text-on-surface-variant hover:bg-surface-container disabled:opacity-50 cursor-pointer transition-colors"
@@ -692,13 +944,13 @@ export default function UserManagementPage() {
                 <h3 className="font-headline-md text-headline-md text-primary font-bold border-b border-outline-variant/40 pb-sm mb-sm">
                   Nhập Người Dùng Từ Excel
                 </h3>
-                
+
                 <div className="flex flex-col gap-sm">
                   <p className="text-body-md text-on-surface-variant">
                     Vui lòng tải xuống file mẫu và điền dữ liệu theo đúng định dạng. Các cột yêu cầu: <b>Mật khẩu</b>, <b>Họ và tên</b>, <b>Email</b>, <b>Số điện thoại</b>, <b>Khoa</b>.
                   </p>
-                  
-                  <button 
+
+                  <button
                     onClick={handleDownloadTemplate}
                     className="mt-2 text-primary font-label-md flex items-center gap-2 hover:underline self-start bg-transparent border-none cursor-pointer"
                   >
@@ -706,7 +958,7 @@ export default function UserManagementPage() {
                     Tải file Excel mẫu
                   </button>
                 </div>
-                
+
                 <div className="flex flex-col gap-xs mt-2">
                   <label className="text-label-md font-semibold text-on-surface-variant" htmlFor="import-role">Vai trò cho danh sách import này</label>
                   <select
@@ -728,7 +980,7 @@ export default function UserManagementPage() {
                   <span className="material-symbols-outlined text-4xl text-on-surface-variant mb-2 group-hover:scale-110 transition-transform duration-300">upload_file</span>
                   <p className="text-label-md text-on-surface font-semibold mb-1">Kéo thả file vào đây hoặc nhấn để chọn</p>
                   <p className="text-body-sm text-on-surface-variant mb-4">Hỗ trợ định dạng .xlsx, .xls (Tối đa 500 dòng)</p>
-                  
+
                   <input
                     type="file"
                     id="excel-upload"
@@ -736,7 +988,7 @@ export default function UserManagementPage() {
                     className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                     onChange={handleFileUpload}
                   />
-                  <label 
+                  <label
                     htmlFor="excel-upload"
                     className="px-4 py-2 bg-primary-container text-on-primary-container rounded-lg font-label-md pointer-events-none group-hover:bg-primary/20 transition-colors"
                   >
