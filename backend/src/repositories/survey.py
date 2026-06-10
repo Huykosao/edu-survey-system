@@ -101,7 +101,10 @@ def submit_response_atomic(survey_id: int, user_id: int, subject_id: int | None,
             'p_raw_content_text': raw_content_text,
             'p_is_anonymous': is_anonymous
         }).execute()
-        return result.data
+        data = result.data
+        if isinstance(data, list) and len(data) > 0:
+            return data[0]
+        return data or {}
     except Exception as e:
         # Nếu Postgres throw unique constraint violation, RPC sẽ fail
         if "unique constraint" in str(e).lower() or "survey_participations" in str(e).lower() or "23505" in str(e):
