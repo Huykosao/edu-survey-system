@@ -425,6 +425,8 @@ export default function ReportsPage() {
              val1: keys[0] ? `${keys[0]}: ${dist[keys[0]]}` : "",
              val2: keys[1] ? `${keys[1]}: ${dist[keys[1]]}` : "",
              val3: keys[2] ? `${keys[2]}: ${dist[keys[2]]}` : "",
+             val4: keys[3] ? `${keys[3]}: ${dist[keys[3]]}` : "",
+             val5: keys[4] ? `${keys[4]}: ${dist[keys[4]]}` : "",
            });
         }
       } else if (q.question_type === "open_ended") {
