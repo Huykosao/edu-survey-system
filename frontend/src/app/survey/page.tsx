@@ -77,9 +77,18 @@ export default function SurveyRespondentPage() {
     setLoadingData(true);
     try {
       const [activeList, doneList, newsList] = await Promise.all([
-        surveysApi.mySurveys(),
-        surveysApi.myCompletedSurveys(),
-        improvementsApi.list(),
+        surveysApi.mySurveys().catch((err) => {
+          console.error("Failed to load active surveys", err);
+          return [];
+        }),
+        surveysApi.myCompletedSurveys().catch((err) => {
+          console.error("Failed to load completed surveys", err);
+          return [];
+        }),
+        improvementsApi.list().catch((err) => {
+          console.error("Failed to load improvements", err);
+          return [];
+        }),
       ]);
       setSurveys((activeList as any[]) || []);
       setCompletedSurveys((doneList as any[]) || []);

@@ -52,16 +52,61 @@ def list_published_surveys() -> list[dict]:
     result = supabase_client.table("surveys").select("*").eq("status", "published").execute()
     return result.data or []
 
+def list_surveys_by_ids(survey_ids: list[int]) -> list[dict]:
+    if not survey_ids:
+        return []
+    result = supabase_client.table("surveys").select("*").in_("id", survey_ids).execute()
+    return result.data or []
+
 
 def list_responded_survey_ids(user_id: int) -> list[int]:
     """Lấy danh sách survey_id mà user đã nộp phản hồi."""
     result = (
-        supabase_client.table("survey_responses")
+        supabase_client.table("survey_participations")
         .select("survey_id")
         .eq("user_id", user_id)
         .execute()
     )
     return list({row["survey_id"] for row in (result.data or [])})
+
+def check_participation(survey_id: int, user_id: int) -> bool:
+    """Kiểm tra user đã tham gia khảo sát chưa thông qua bảng survey_participations."""
+    result = (
+        supabase_client.table("survey_participations")
+        .select("id")
+        .eq("survey_id", survey_id)
+        .eq("user_id", user_id)
+        .execute()
+    )
+    return len(result.data) > 0
+
+def record_participation(survey_id: int, user_id: int) -> dict:
+    """Ghi nhận user đã tham gia khảo sát (để tránh nộp trùng)."""
+    result = supabase_client.table("survey_participations").insert({
+        "survey_id": survey_id,
+        "user_id": user_id
+    }).execute()
+    if not result.data:
+        raise HTTPException(status_code=500, detail="Ghi nhận tham gia thất bại")
+    return result.data[0]
+
+def submit_response_atomic(survey_id: int, user_id: int, subject_id: int | None, answers: dict, raw_content_text: str, is_anonymous: bool) -> dict:
+    """Sử dụng RPC để submit response và record participation trong một transaction."""
+    try:
+        result = supabase_client.rpc('submit_survey_response_tx', {
+            'p_survey_id': survey_id,
+            'p_user_id': user_id,
+            'p_subject_id': subject_id,
+            'p_answers': answers,
+            'p_raw_content_text': raw_content_text,
+            'p_is_anonymous': is_anonymous
+        }).execute()
+        return result.data
+    except Exception as e:
+        # Nếu Postgres throw unique constraint violation, RPC sẽ fail
+        if "unique constraint" in str(e).lower() or "survey_participations" in str(e).lower() or "23505" in str(e):
+            raise HTTPException(status_code=400, detail="Bạn đã gửi phản hồi cho khảo sát này rồi.")
+        raise HTTPException(status_code=500, detail=f"Gửi phản hồi thất bại: {str(e)}")
 
 
 # ── Survey Responses ──────────────────────────────────────────────────────────

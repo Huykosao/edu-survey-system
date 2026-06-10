@@ -108,15 +108,15 @@ def get_surveys_for_user(current_user: dict) -> list[dict]:
 
 
 def get_completed_surveys_for_user(current_user: dict) -> list[dict]:
-    """Lấy danh sách khảo sát mà user ĐÃ nộp phản hồi."""
+    """Lấy danh sách khảo sát mà user ĐÃ nộp phản hồi, bất kể trạng thái hiện tại (closed/draft/etc)."""
     user_id = current_user.get("id")
     if not user_id:
         return []
     responded_ids = survey_repo.list_responded_survey_ids(user_id)
     if not responded_ids:
         return []
-    all_published = survey_repo.list_published_surveys()
-    return [s for s in all_published if s["id"] in responded_ids]
+    # Tìm nạp trực tiếp bằng ID thay vì lọc trong bộ nhớ toàn bộ khảo sát published
+    return survey_repo.list_surveys_by_ids(responded_ids)
 
 
 def duplicate_survey(survey_id: int, created_by: int) -> dict:
@@ -186,19 +186,17 @@ def submit_survey_response(survey_id: int, data: dict, user_id: int) -> dict:
     else:
         raw_text = data.get("raw_content_text", "")
 
-    # Luôn kiểm tra trùng lặp — mỗi user chỉ nộp 1 lần
-    if survey_repo.get_my_response(survey_id, user_id):
-        raise HTTPException(status_code=400, detail="Bạn đã gửi phản hồi cho khảo sát này rồi.")
+    is_anonymous = survey.get("is_anonymous", True)
 
-    resp_data = {
-        "survey_id": survey_id,
-        "user_id": user_id,  # Luôn lưu user_id để tracking; anonymity xử lý ở tầng hiển thị
-        "subject_id": data.get("subject_id"),
-        "answers": answers,
-        "raw_content_text": raw_text,
-    }
-    
-    new_response = survey_repo.create_response(resp_data)
+    # Sử dụng RPC để thực hiện trong 1 transaction an toàn
+    new_response = survey_repo.submit_response_atomic(
+        survey_id=survey_id,
+        user_id=user_id,
+        subject_id=data.get("subject_id"),
+        answers=answers,
+        raw_content_text=raw_text,
+        is_anonymous=is_anonymous
+    )
 
     # CHIẾN LƯỢC: Cache Invalidation
     # Xóa thống kê cũ để lần gọi analysis tiếp theo sẽ tính toán lại dữ liệu mới nhất
