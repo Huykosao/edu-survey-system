@@ -40,13 +40,14 @@ export default function UserManagementPage() {
   useEffect(() => {
     const handler = setTimeout(() => {
       setDebouncedSearchQuery(searchQuery);
+      setCurrentPage(1);
     }, 400);
     return () => clearTimeout(handler);
   }, [searchQuery]);
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, selectedRole, selectedStatus]);
+  }, [selectedRole, selectedStatus]);
 
   // Form states for new user
   const [newName, setNewName] = useState("");
@@ -69,6 +70,8 @@ export default function UserManagementPage() {
       else if (selectedRole === "Quản lý") apiRole = "MANAGER";
       else if (selectedRole === "Giảng viên") apiRole = "LECTURER";
       else if (selectedRole === "Sinh viên") apiRole = "STUDENT";
+      else if (selectedRole === "Cựu sinh viên") apiRole = "ALUMNI";
+      else if (selectedRole === "Nhà tuyển dụng") apiRole = "EMPLOYER";
 
       let apiStatus = undefined;
       if (selectedStatus === "Hoạt động") apiStatus = "active";
@@ -384,6 +387,8 @@ export default function UserManagementPage() {
             <option value="Giảng viên">Giảng viên</option>
             <option value="Quản lý">Quản lý</option>
             <option value="Quản trị viên">Quản trị viên</option>
+            <option value="Cựu sinh viên">Cựu sinh viên</option>
+            <option value="Nhà tuyển dụng">Nhà tuyển dụng</option>
           </select>
           <select
             value={selectedStatus}

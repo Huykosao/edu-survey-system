@@ -468,7 +468,7 @@ export default function AdminLayout({
         )}
 
         {/* Main Content Area */}
-        <main className="flex-1 md:ml-[260px] p-4 md:p-6 overflow-y-auto md:overflow-y-hidden bg-background transition-all duration-200 h-[calc(100dvh-4rem)]">
+        <main className="flex-1 md:ml-[260px] p-4 md:p-6 overflow-y-auto bg-background transition-all duration-200 h-[calc(100dvh-4rem)]">
           <div className="max-w-[1400px] mx-auto w-full h-full">{children}</div>
         </main>
       </div>
