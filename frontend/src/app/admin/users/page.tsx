@@ -9,7 +9,7 @@ interface User {
   id: string;
   name: string;
   email: string;
-  role: "Sinh viên" | "Giảng viên" | "Quản lý" | "Quản trị viên";
+  role: "Sinh viên" | "Giảng viên" | "Quản lý" | "Quản trị viên" | "Cựu sinh viên" | "Nhà tuyển dụng";
   status: "Hoạt động" | "Tạm khóa";
   avatarInitials: string;
 }
@@ -457,13 +457,13 @@ export default function UserManagementPage() {
           <span>Không tìm thấy người dùng nào khớp với bộ lọc.</span>
         </div>
       ) : viewMode === "grid" ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 items-stretch gap-3 md:flex-1 md:min-h-0 md:overflow-y-auto overflow-visible pr-1">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 items-stretch content-start gap-3 md:flex-1 md:min-h-0 md:overflow-y-auto overflow-visible pr-1">
           {paginatedUsers.map((user) => {
             const isLocked = user.status === "Tạm khóa";
             return (
               <div
                 key={user.id}
-                className={`rounded-lg p-3 lg:p-4 hover:shadow-[0_4px_12px_rgba(0,0,0,0.05)] transition-all duration-200 flex flex-col justify-between h-full relative bg-surface-container-lowest border ${
+                className={`rounded-lg p-3 lg:p-4 hover:shadow-[0_4px_12px_rgba(0,0,0,0.05)] transition-all duration-200 flex flex-col justify-between gap-3 lg:gap-4 relative bg-surface-container-lowest border ${
                   isLocked ? "border-error-container" : "border-outline-variant"
                 } ${openDropdown === user.id ? "z-50" : "z-0"}`}
               >
