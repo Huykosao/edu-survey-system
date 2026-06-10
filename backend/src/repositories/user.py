@@ -46,7 +46,7 @@ def list_users(
     if user_ids is not None:
         query = query.in_("id", user_ids)
     if search:
-        escaped_search = search.replace('\\', '\\\\').replace('"', '\\"')
+        escaped_search = search.replace('"', '""')
         query = query.or_(f'full_name.ilike."*{escaped_search}*",email.ilike."*{escaped_search}*"')
     offset = (page - 1) * limit
     result = query.range(offset, offset + limit - 1).order("created_at", desc=True).execute()
