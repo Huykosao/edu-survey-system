@@ -86,7 +86,7 @@ def submit_response_atomic(survey_id: int, user_id: int, subject_id: int | None,
         return data or {}
     except Exception as e:
         # Nếu Postgres throw unique constraint violation, RPC sẽ fail
-        if "unique constraint" in str(e).lower() or "survey_participations" in str(e).lower() or "23505" in str(e):
+        if getattr(e, "code", None) == "23505" or "unique constraint" in str(e).lower() or "survey_participations" in str(e).lower():
             raise HTTPException(status_code=400, detail="Bạn đã gửi phản hồi cho khảo sát này rồi.")
         raise HTTPException(status_code=500, detail=f"Gửi phản hồi thất bại: {str(e)}")
 
