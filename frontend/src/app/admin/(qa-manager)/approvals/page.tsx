@@ -129,7 +129,7 @@ export default function ApprovalsPage() {
               </div>
 
               <div className="bg-surface p-md rounded-2xl border border-outline-variant/50 text-sm space-y-3">
-                <p className="text-xs text-on-surface-variant leading-relaxed bg-surface-container-low p-3 rounded-xl">
+                <p className="text-xs text-on-surface-variant leading-relaxed bg-surface-container-low p-3 rounded-xl whitespace-pre-wrap">
                   <strong className="text-on-surface">Lý do giải trình gốc:</strong> <br/>{item.originalReason}
                 </p>
                 <div className="border-t border-outline-variant/20 pt-sm mt-sm">
