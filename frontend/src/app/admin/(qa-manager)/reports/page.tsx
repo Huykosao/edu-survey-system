@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect, useMemo } from "react";
 import { surveysApi } from "@/lib/api";
-import ExcelJS from "exceljs";
 import {
   BarChart,
   Bar,
@@ -296,6 +295,9 @@ export default function ReportsPage() {
   const handleExportExcel = async () => {
     if (!analysis || !selectedReport) return;
 
+    // Nhập động exceljs để tối ưu thời gian tải trang ban đầu
+    const ExcelJS = (await import("exceljs")).default;
+
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet("Báo cáo phân tích", {
       views: [{ showGridLines: false }], // Ẩn lưới mặc định cho chuyên nghiệp
@@ -333,9 +335,9 @@ export default function ReportsPage() {
     sheet.getRow(2).height = 30;
     sheet.getCell("A2").alignment = { vertical: "middle", horizontal: "left" };
 
-    sheet.addRow({ cauSo: "", noiDung: "Tổng số phản hồi", loai: analysis.total_responses });
-    sheet.addRow({ cauSo: "", noiDung: "CSAT (Hài lòng tổng thể)", loai: `${overviewStats?.globalCSAT}/5.0` });
-    sheet.addRow({ cauSo: "", noiDung: "NPS (Chỉ số trung thành)", loai: overviewStats?.npsScore });
+    sheet.addRow({ cauSo: "", noiDung: "Tổng số phản hồi", loai: analysis.total_responses ?? 0 });
+    sheet.addRow({ cauSo: "", noiDung: "CSAT (Hài lòng tổng thể)", loai: overviewStats?.globalCSAT ? `${overviewStats.globalCSAT}/5.0` : "Không áp dụng" });
+    sheet.addRow({ cauSo: "", noiDung: "NPS (Chỉ số trung thành)", loai: overviewStats?.npsScore ?? "Không áp dụng" });
     
     // Làm đậm cột B trong phần tổng quan
     for (let i = 3; i <= 5; i++) {
@@ -391,7 +393,7 @@ export default function ReportsPage() {
       if (q.question_type === "likert") {
         sheet.addRow({
           noiDung: "→ Điểm TB & Phân bổ (Mức 1 đến 5)",
-          val1: `TB: ${q.stats?.average}`,
+          val1: `TB: ${q.stats?.average ?? "Không áp dụng"}`,
           val2: `Mức 1: ${q.stats?.distribution?.["1"] || 0}`,
           val3: `Mức 2: ${q.stats?.distribution?.["2"] || 0}`,
           val4: `Mức 3: ${q.stats?.distribution?.["3"] || 0}`,
@@ -400,7 +402,7 @@ export default function ReportsPage() {
       } else if (q.question_type === "nps") {
          sheet.addRow({
           noiDung: "→ Điểm NPS & Phân bổ",
-          val1: `NPS: ${q.stats?.score}`,
+          val1: `NPS: ${q.stats?.score ?? "Không áp dụng"}`,
           val2: `Ủng hộ: ${q.stats?.distribution?.promoters || 0}`,
           val3: `Thường: ${q.stats?.distribution?.passives || 0}`,
           val4: `Phản đối: ${q.stats?.distribution?.detractors || 0}`,
