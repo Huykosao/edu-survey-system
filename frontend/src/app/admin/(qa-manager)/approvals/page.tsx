@@ -137,7 +137,7 @@ export default function ApprovalsPage() {
                     <span className="material-symbols-outlined text-[20px] flex-shrink-0">chat</span>
                     <span>Nội dung giảng viên viết gửi Sinh viên:</span>
                   </div>
-                  <p className="italic text-on-surface leading-relaxed text-base border-l-4 border-primary/40 pl-3 py-1 bg-primary/5 rounded-r-xl">
+                  <p className="italic text-on-surface leading-relaxed text-base border-l-4 border-primary/40 pl-3 py-1 bg-primary/5 rounded-r-xl whitespace-pre-wrap">
                     &quot;{item.messageContent}&quot;
                   </p>
                 </div>
