@@ -295,10 +295,11 @@ export default function ReportsPage() {
   const handleExportExcel = async () => {
     if (!analysis || !selectedReport) return;
 
-    // Nhập động exceljs để tối ưu thời gian tải trang ban đầu
-    const ExcelJS = (await import("exceljs")).default;
+    try {
+      // Nhập động exceljs để tối ưu thời gian tải trang ban đầu
+      const ExcelJS = (await import("exceljs")).default;
 
-    const workbook = new ExcelJS.Workbook();
+      const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet("Báo cáo phân tích", {
       views: [{ showGridLines: false }], // Ẩn lưới mặc định cho chuyên nghiệp
     });
@@ -447,15 +448,27 @@ export default function ReportsPage() {
       }
     });
 
-    // Xuất file
-    const buffer = await workbook.xlsx.writeBuffer();
-    const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-    const url = window.URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = `BaoCao_Excel_${selectedReport.id}.xlsx`;
-    anchor.click();
-    window.URL.revokeObjectURL(url);
+      // Xuất file
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+      const url = window.URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `BaoCao_Excel_${selectedReport.id}.xlsx`;
+      
+      document.body.appendChild(anchor); // Rất quan trọng cho Firefox/Safari
+      anchor.click();
+      document.body.removeChild(anchor);
+
+      // Trì hoãn thu hồi URL để trình duyệt kịp tải xuống
+      setTimeout(() => {
+        window.URL.revokeObjectURL(url);
+      }, 1000);
+      
+    } catch (error) {
+      console.error("Lỗi khi xuất file Excel:", error);
+      alert("Đã xảy ra lỗi trong quá trình xử lý file Excel. Vui lòng thử lại sau.");
+    }
   };
 
   return (
