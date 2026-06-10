@@ -2,7 +2,8 @@ import google.genai as genai
 from google.genai import types
 from src.config import env
 from src.models.gemini import ClassificationResponse, FinalSurveyReport
-from src.repositories import survey as repo
+from src.repositories import survey as survey_repo
+from src.repositories import ai_report
 from src.repositories.label import get_labels_by_role
 from src.config.ai import build_analysis_prompt, build_classification_prompt
 
@@ -16,7 +17,7 @@ def classify_survey_process(survey_id: int, role_id: int = None):
     - role_id: Nếu không truyền, service sẽ tự lấy role_id từ target_config của bài khảo sát.
     """
     # 1. Lấy thông tin bài khảo sát & Xác định Role ID mục tiêu
-    survey_struct = repo.get_survey_structure(survey_id)
+    survey_struct = survey_repo.get_survey_structure(survey_id)
     if not survey_struct:
         raise ValueError(f"Không tìm thấy khảo sát có ID {survey_id}")
 
@@ -35,7 +36,7 @@ def classify_survey_process(survey_id: int, role_id: int = None):
     labels_text = "\n".join([f"lb_{l['id']} | {l['label_name']}" for l in labels])
     
     # 3. Lấy tất cả câu trả lời và lọc ra các câu hỏi mở
-    all_responses = repo.get_all_responses_by_survey(survey_id)
+    all_responses = survey_repo.get_all_responses_by_survey(survey_id)
     open_questions = []
     for section in survey_struct.get("content", {}).get("sections", []):
         for q in section.get("questions", []):
@@ -56,7 +57,11 @@ def classify_survey_process(survey_id: int, role_id: int = None):
         for r in all_responses:
             text = r.get("answers", {}).get(q_id)
             if text and len(text.strip()) > 2:
-                question_feedbacks.append({"res_id": r["id"], "text": text})
+                question_feedbacks.append({
+                    "res_id": r["id"],
+                    "question_id": q_id,
+                    "text": text
+                })
 
         if not question_feedbacks: continue
 
@@ -73,7 +78,10 @@ def classify_survey_process(survey_id: int, role_id: int = None):
 
         # 6. Gọi AI xử lý từng Batch
         for batch in batches:
-            fb_text = "\n".join([f"res_{f['res_id']} | {f['text']}" for f in batch])
+            fb_text = "\n".join([
+                f"res_{f['res_id']}|{f['question_id']}|{f['text']}"
+                for f in batch
+            ])
             prompt = build_classification_prompt(q_label, labels_text, fb_text)
             
             response = client.models.generate_content(
@@ -97,72 +105,300 @@ def classify_survey_process(survey_id: int, role_id: int = None):
                 for cls in item.classifications:
                     rows_to_save.append({
                         "response_id": res_id,
+                        "question_id": item.question_id,
                         "label_id": int(cls.label_id.replace("lb_", "")),
-                        "sentiment": cls.sentiment
+                        "sentiment": cls.sentiment,
+                        "feedback_text": next(
+                            f["text"]
+                            for f in batch
+                            if f["res_id"] == res_id
+                            and f["question_id"] == item.question_id
+                        )
                     })
                 
-                # Cập nhật JSON tóm tắt vào bảng survey_responses để hiển thị nhanh
-                summary_meta = [{"lb": c.label_id, "s": c.sentiment} for c in item.classifications]
-                repo.update_response_ai_metadata(res_id, summary_meta)
+                # # Cập nhật JSON tóm tắt vào bảng survey_responses để hiển thị nhanh
+                # summary_meta = [{"lb": c.label_id, "s": c.sentiment} for c in item.classifications]
+                # survey_repo.update_response_ai_metadata(res_id, summary_meta)
 
             if rows_to_save:
-                repo.bulk_insert_response_labels(rows_to_save)
+                survey_repo.bulk_insert_response_labels(rows_to_save)
                 total_processed_labels += len(rows_to_save)
 
     return total_processed_labels
 
+from collections import defaultdict
+
+import traceback
+from collections import defaultdict
+
 def generate_trend_analysis(survey_id: int):
-    """Dựa trên dữ liệu đã gán nhãn và điểm số để lập báo cáo tổng hợp"""
-    # 1. Lấy dữ liệu định lượng (Likert/NPS) và định tính (Text đã gán nhãn)
-    stats = repo.get_survey_stats_data(survey_id)
-    labeled_data = repo.get_labeled_feedbacks_for_report(survey_id)
 
-    if not labeled_data and not stats:
-        raise ValueError("Chưa có đủ dữ liệu (thống kê hoặc nhãn) để lập báo cáo.")
+    print("\n==============================")
+    print(f"START AI REPORT survey_id={survey_id}")
+    print("==============================\n")
 
-    # 2. Định dạng dữ liệu thống kê cho AI
-    stats_lines = []
-    q_analysis = stats.get('question_analysis', {})
-    for q_id, info in q_analysis.items():
-        q_label = info.get('question_label')
-        q_stats = info.get('stats', {})
-        stype = info.get('question_type')
-        if stype == 'likert':
-            stats_lines.append(f"- {q_label}: TB {q_stats.get('average')}/5. (Phân phối 1-5: {q_stats.get('score_distribution')})")
-        elif stype == 'nps':
-            stats_lines.append(f"- {q_label}: NPS {q_stats.get('score')}. (Thúc đẩy: {q_stats.get('distribution',{}).get('promoters')})")
+    try:
 
-    # 3. Gom nhóm feedback theo nhãn để AI tóm tắt từng chủ đề
-    fb_groups = {}
-    for item in labeled_data:
-        lname = item['label_name']
-        if lname not in fb_groups: fb_groups[lname] = {"pos": [], "neg": []}
-        key = "pos" if item['sentiment'] == 'positive' else "neg"
-        fb_groups[lname][key].append(item['text'])
-    
-    fb_lines = []
-    for lname, content in fb_groups.items():
-        fb_lines.append(f"Chủ đề [{lname}]:")
-        if content['pos']: fb_lines.append(f"  + Tích cực: {'. '.join(content['pos'][:3])}")
-        if content['neg']: fb_lines.append(f"  - Tiêu cực: {'. '.join(content['neg'][:3])}")
+        # =====================================================
+        # 1. LOAD DATA
+        # =====================================================
 
-    # 4. Gọi AI lập báo cáo tổng hợp (Executive Summary & Key Findings)
-    client = genai.Client(api_key=env.GEMINI_API_KEY)
-    prompt = build_analysis_prompt("\n".join(stats_lines), "\n".join(fb_lines))
-
-    response = client.models.generate_content(
-        model=env.GEMINI_MODEL,
-        contents=prompt,
-        config=types.GenerateContentConfig(
-            response_mime_type="application/json",
-            response_schema=FinalSurveyReport,
-            temperature=0.2
+        stats = survey_repo.get_survey_stats_data(survey_id) or {}
+        overview = (
+            ai_report.get_dashboard_overview(
+                survey_id
+            ) or {}
         )
-    )
+        label_summary = (
+            ai_report.get_label_sentiment_summary(
+                survey_id
+            ) or []
+        )
+        question_summary = (
+            ai_report.get_question_sentiment_summary(
+                survey_id
+            ) or []
+        )
+        feedback_examples = (
+            ai_report.get_feedback_examples(
+                survey_id,
+                limit=50
+            ) or []
+        )
+        if (
+            not stats
+            and not label_summary
+            and not feedback_examples
+        ):
+            raise ValueError(
+                "Chưa có đủ dữ liệu để lập báo cáo."
+            )
 
-    result = FinalSurveyReport.model_validate_json(response.text)
-    
-    # 5. Lưu kết quả báo cáo vào DB
-    repo.insert_ai_report(survey_id, result.model_dump())
-    
-    return result
+        # =====================================================
+        # 2. QUANTITATIVE ANALYSIS
+        # =====================================================
+        stats_lines = []
+        q_analysis = (
+            stats.get(
+                "question_analysis",
+                {}
+            ) or {}
+        )
+
+        for q_id, info in q_analysis.items():
+
+            q_label = info.get(
+                "question_label"
+            )
+
+            q_stats = info.get(
+                "stats",
+                {}
+            )
+
+            stype = info.get(
+                "question_type"
+            )
+
+            if stype == "likert":
+
+                stats_lines.append(
+                    f"""
+{q_label}
+- Điểm trung bình: {q_stats.get('average')}/5
+- Phân phối: {q_stats.get('score_distribution')}
+""".strip()
+                )
+
+            elif stype == "nps":
+
+                stats_lines.append(
+                    f"""
+{q_label}
+- NPS: {q_stats.get('score')}
+- Distribution:
+{q_stats.get('distribution')}
+""".strip()
+                )
+
+        print(
+            f"[6] Quantitative blocks: {len(stats_lines)}"
+        )
+
+        # =====================================================
+        # 3. OVERVIEW
+        # =====================================================
+        overview_lines = []
+
+        if overview:
+
+            overview_lines.append(
+                f"""
+Tổng số phiếu khảo sát: {overview.get('total_responses', 0)}
+Tổng phản hồi mở: {overview.get('total_open_feedbacks', 0)}
+Tổng nhãn AI đã gán: {overview.get('total_labels', 0)}
+
+Positive: {overview.get('positive_count', 0)}
+Negative: {overview.get('negative_count', 0)}
+Neutral: {overview.get('neutral_count', 0)}
+""".strip()
+            )
+        # =====================================================
+        # 4. LABEL SUMMARY
+        # =====================================================
+        label_lines = []
+
+        for row in label_summary:
+
+            label_lines.append(
+                f"""
+Chủ đề: {row['label_name']}
+
+- Tổng phản hồi: {row['total_count']}
+- Tích cực: {row['positive_count']}
+- Tiêu cực: {row['negative_count']}
+- Trung lập: {row['neutral_count']}
+""".strip()
+            )
+        # =====================================================
+        # 5. QUESTION SUMMARY
+        # =====================================================
+        question_lines = []
+
+        for row in question_summary:
+
+            question_lines.append(
+                f"""
+Câu hỏi mở: {row['question_id']}
+
+- Tổng phản hồi: {row['total_count']}
+- Tích cực: {row['positive_count']}
+- Tiêu cực: {row['negative_count']}
+- Trung lập: {row['neutral_count']}
+""".strip()
+            )
+        # =====================================================
+        # 6. FEEDBACK EXAMPLES
+        # =====================================================
+        grouped_feedbacks = defaultdict(
+            lambda: {
+                "positive": [],
+                "negative": [],
+                "neutral": []
+            }
+        )
+
+        for fb in feedback_examples:
+
+            label = fb["label_name"]
+
+            sentiment = (
+                fb["sentiment"]
+                or "neutral"
+            ).lower()
+
+            if sentiment not in grouped_feedbacks[label]:
+                continue
+
+            if len(
+                grouped_feedbacks[label][sentiment]
+            ) < 3:
+
+                grouped_feedbacks[label][
+                    sentiment
+                ].append(
+                    {
+                        "question_id": fb["question_id"],
+                        "text": fb["feedback_text"]
+                    }
+                )
+
+        feedback_lines = []
+
+        for label, sentiments in grouped_feedbacks.items():
+
+            feedback_lines.append(
+                f"\n===== {label} ====="
+            )
+
+            for sentiment_type in [
+                "positive",
+                "negative",
+                "neutral"
+            ]:
+
+                if sentiments[sentiment_type]:
+
+                    feedback_lines.append(
+                        f"\n{sentiment_type.upper()}:"
+                    )
+
+                    for item in sentiments[
+                        sentiment_type
+                    ]:
+
+                        feedback_lines.append(
+                            f"- [{item['question_id']}] {item['text']}"
+                        )
+        # =====================================================
+        # 7. BUILD CONTEXT
+        # =====================================================
+        analysis_context = f"""
+=== DASHBOARD OVERVIEW ===
+
+{chr(10).join(overview_lines)}
+
+=== QUANTITATIVE RESULTS ===
+
+{chr(10).join(stats_lines)}
+
+=== LABEL SENTIMENT SUMMARY ===
+
+{chr(10).join(label_lines)}
+
+=== OPEN QUESTION SUMMARY ===
+
+{chr(10).join(question_lines)}
+
+=== FEEDBACK EXAMPLES ===
+
+{chr(10).join(feedback_lines)}
+"""
+        # =====================================================
+        # 8. AI GENERATION
+        # =====================================================
+        client = genai.Client(
+            api_key=env.GEMINI_API_KEY
+        )
+        prompt = build_analysis_prompt(
+            analysis_context
+        )
+
+        response = client.models.generate_content(
+            model=env.GEMINI_MODEL,
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json",
+                response_schema=FinalSurveyReport,
+                temperature=0.2
+            )
+        )
+        result = (
+            FinalSurveyReport
+            .model_validate_json(
+                response.text
+            )
+        )
+
+        # =====================================================
+        # 9. SAVE REPORT
+        # =====================================================
+        survey_repo.insert_ai_report(
+            survey_id,
+            result.model_dump()
+        )
+
+        return result
+
+    except Exception as e:
+        raise e

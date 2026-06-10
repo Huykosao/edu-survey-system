@@ -12,16 +12,10 @@ DANH SÁCH PHẢN HỒI:
 {feedbacks_text}
 """
 
-def build_analysis_prompt(stats_text: str, feedback_context: str) -> str:
+def build_analysis_prompt(context: str) -> str:
     return f"""
 Bạn là chuyên gia phân tích dữ liệu cao cấp. Hãy lập báo cáo tổng hợp từ dữ liệu khảo sát sau:
-
-DỮ LIỆU ĐỊNH LƯỢNG (Thống kê câu hỏi đóng):
-{stats_text}
-
-DỮ LIỆU ĐỊNH TÍNH (Ý kiến sinh viên đã gán nhãn theo chủ đề):
-{feedback_context}
-
+{context}
 NHIỆM VỤ:
 1. Phân tích sự tương quan giữa các con số thống kê và ý kiến thực tế của sinh viên.
 2. Tóm gọn nội dung từng nhóm chủ đề (ví dụ: Cơ sở vật chất, Giảng dạy).

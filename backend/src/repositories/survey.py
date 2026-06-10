@@ -151,7 +151,7 @@ def update_survey_stat(
 
 def list_responses_with_filters(survey_id: int, segment_type: str = "OVERALL", segment_value: str = "ALL") -> list[dict]:
     # Base query
-    query = supabase_client.table("survey_responses").select("*, users!inner(id, profile_details(*))").eq("survey_id", survey_id)
+    query = supabase_client.table("survey_responses").select("*").eq("survey_id", survey_id)
     
     # Lọc theo Môn học
     # Lọc theo Môn học

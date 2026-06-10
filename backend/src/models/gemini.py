@@ -31,6 +31,7 @@ class ClassificationItem(BaseModel):
 
 class FeedbackClassification(BaseModel):
     feedback_id: str
+    question_id: str
     classifications: List[ClassificationItem]
 
 class ClassificationResponse(BaseModel):

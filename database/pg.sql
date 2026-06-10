@@ -258,7 +258,9 @@ CREATE TABLE public.response_labels (
 
     confidence NUMERIC(5,4),
 
-    created_at TIMESTAMPTZ DEFAULT now()
+    created_at TIMESTAMPTZ DEFAULT now(),
+    feedback_text text,
+    question_id varchar(50);
 );
 
 CREATE INDEX idx_response_labels_response
