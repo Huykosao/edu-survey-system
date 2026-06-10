@@ -320,7 +320,7 @@ export default function ReportsPage() {
     sheet.getColumn("noiDung").alignment = { wrapText: true, vertical: "middle" };
 
     // --- TIÊU ĐỀ BÁO CÁO ---
-    const titleRow = sheet.addRow([`BÁO CÁO PHÂN TÍCH: ${selectedReport.title.toUpperCase()}`]);
+    const titleRow = sheet.addRow(["BÁO CÁO PHÂN TÍCH: " + (selectedReport.title || "").toUpperCase()]);
     sheet.mergeCells(titleRow.number, 1, titleRow.number, 8);
     titleRow.height = 40;
     const titleCell = titleRow.getCell(1);
