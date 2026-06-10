@@ -952,7 +952,7 @@ export default function UserManagementPage() {
 
                   <button
                     onClick={handleDownloadTemplate}
-                    className="mt-2 text-primary font-label-md flex items-center gap-2 hover:underline self-start bg-transparent border-none cursor-pointer"
+                    className="mt-2 text-primary font-label-md flex items-center gap-2 hover:bg-primary/8 px-2 py-1 rounded-lg self-start bg-transparent border-none cursor-pointer transition-colors"
                   >
                     <span className="material-symbols-outlined text-[20px]">download</span>
                     Tải file Excel mẫu

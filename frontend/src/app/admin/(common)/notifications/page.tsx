@@ -186,7 +186,7 @@ export default function NotificationCenterPage() {
                         e.stopPropagation();
                         handleMarkAsRead(n.id);
                       }}
-                      className="text-xs font-bold text-primary hover:underline flex items-center gap-1 self-start mt-1 cursor-pointer"
+                      className="text-xs font-bold text-primary hover:bg-primary/8 px-2 py-0.5 rounded-lg flex items-center gap-1 self-start mt-1 cursor-pointer transition-colors"
                     >
                       Đánh dấu là đã đọc
                     </button>

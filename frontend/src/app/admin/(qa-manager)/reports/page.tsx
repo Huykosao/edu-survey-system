@@ -29,7 +29,7 @@ const COLORS = [
 // --- Component: Thẻ chỉ số KPI ---
 const KPICard = ({ title, value, icon, color, subValue }: any) => (
   <div
-    className="bg-surface-container-lowest border border-outline-variant p-lg rounded-[2rem] flex items-center gap-lg shadow-sm border-b-4 animate-in slide-in-from-bottom duration-500"
+    className="bg-surface-container-lowest border border-outline-variant p-lg rounded-2xl flex items-center gap-lg shadow-sm border-b-4 animate-in slide-in-from-bottom duration-500"
     style={{ borderBottomColor: color }}
   >
     <div
@@ -310,39 +310,6 @@ export default function ReportsPage() {
         </p>
       </div>
 
-      {/* KPI Dashboard Section */}
-      {!isAnalysing && overviewStats && (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-md">
-          <KPICard
-            title="Hài lòng tổng thể (CSAT)"
-            value={`${overviewStats.globalCSAT}/5.0`}
-            subValue={`Đạt ${overviewStats.csatPercentage}% mức độ hài lòng`}
-            icon="sentiment_satisfied"
-            color="#6750A4"
-          />
-          <KPICard
-            title="Chỉ số Trung thành (NPS)"
-            value={
-              overviewStats.npsScore !== null ? overviewStats.npsScore : "N/A"
-            }
-            subValue={
-              overviewStats.npsScore && overviewStats.npsScore > 50
-                ? "Mức độ ủng hộ xuất sắc"
-                : "Cần cải thiện trải nghiệm"
-            }
-            icon="recommend"
-            color="#006A60"
-          />
-          <KPICard
-            title="Quy mô phản hồi"
-            value={overviewStats.totalCompleted}
-            subValue="Sinh viên đã hoàn thành"
-            icon="group"
-            color="#984061"
-          />
-        </div>
-      )}
-
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-lg items-start">
         {/* Sidebar: Danh sách khảo sát */}
         <div className="lg:col-span-1 space-y-sm max-h-[80vh] overflow-y-auto pr-2 sticky top-4 custom-scrollbar">
@@ -363,9 +330,9 @@ export default function ReportsPage() {
               <button
                 key={r.id}
                 onClick={() => setSelectedReport(r)}
-                className={`w-full text-left p-md border rounded-[1.5rem] transition-all duration-300 ${
+                className={`w-full text-left p-md border rounded-2xl transition-all duration-300 cursor-pointer ${
                   selectedReport?.id === r.id
-                    ? "border-primary bg-primary/5 shadow-md scale-[1.02] ring-1 ring-primary/20"
+                    ? "border-primary bg-primary/5 shadow-md ring-1 ring-primary/20"
                     : "border-outline-variant hover:bg-surface-container-low"
                 }`}
               >
@@ -381,12 +348,12 @@ export default function ReportsPage() {
           )}
         </div>
 
-        {/* Content Area: Biểu đồ chi tiết */}
+        {/* Content Area: KPI + Biểu đồ chi tiết */}
         <div className="lg:col-span-3">
           {selectedReport ? (
             <div className="space-y-lg">
               {/* Report Title Card */}
-              <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-surface-container-highest/30 p-lg rounded-[2.5rem] border border-outline-variant gap-4">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-surface-container-highest/30 p-lg rounded-2xl border border-outline-variant gap-4">
                 <div>
                   <h2 className="text-2xl font-black text-on-surface tracking-tight">
                     {selectedReport.title}
@@ -403,7 +370,7 @@ export default function ReportsPage() {
                     </span>
                   </div>
                 </div>
-                <button className="px-6 py-3 bg-primary text-on-primary rounded-full text-sm font-bold flex items-center justify-center gap-2 shadow-lg shadow-primary/25 hover:scale-105 active:scale-95 transition-all">
+                <button className="px-6 py-3 bg-primary text-on-primary rounded-xl text-sm font-bold flex items-center justify-center gap-2 shadow-md hover:bg-primary-container hover:text-on-primary-container active:scale-95 transition-all cursor-pointer shrink-0">
                   <span className="material-symbols-outlined text-lg">
                     picture_as_pdf
                   </span>
@@ -411,8 +378,41 @@ export default function ReportsPage() {
                 </button>
               </div>
 
+              {/* KPI Dashboard — inside content area */}
+              {!isAnalysing && overviewStats && (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-md">
+                  <KPICard
+                    title="Hài lòng tổng thể (CSAT)"
+                    value={`${overviewStats.globalCSAT}/5.0`}
+                    subValue={`Đạt ${overviewStats.csatPercentage}% mức độ hài lòng`}
+                    icon="sentiment_satisfied"
+                    color="#6750A4"
+                  />
+                  <KPICard
+                    title="Chỉ số Trung thành (NPS)"
+                    value={
+                      overviewStats.npsScore !== null ? overviewStats.npsScore : "N/A"
+                    }
+                    subValue={
+                      overviewStats.npsScore && overviewStats.npsScore > 50
+                        ? "Mức độ ủng hộ xuất sắc"
+                        : "Cần cải thiện trải nghiệm"
+                    }
+                    icon="recommend"
+                    color="#006A60"
+                  />
+                  <KPICard
+                    title="Quy mô phản hồi"
+                    value={overviewStats.totalCompleted}
+                    subValue="Sinh viên đã hoàn thành"
+                    icon="group"
+                    color="#984061"
+                  />
+                </div>
+              )}
+
               {isAnalysing ? (
-                <div className="flex flex-col items-center py-40 gap-6 bg-surface-container-lowest rounded-[3rem] border border-dashed border-outline-variant/50">
+                <div className="flex flex-col items-center py-32 gap-6 bg-surface-container-lowest rounded-2xl border border-dashed border-outline-variant/50">
                   <div className="w-14 h-14 border-[5px] border-primary/20 border-t-primary rounded-full animate-spin" />
                   <div className="text-center">
                     <p className="text-on-surface font-black">
@@ -426,21 +426,21 @@ export default function ReportsPage() {
               ) : analysis ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-lg">
                   {Object.entries(analysis.analysis || {}).map(
-                    ([qId, data]: any) => (
+                    ([qId, data]: any, idx: number) => (
                       <div
                         key={qId}
-                        className="bg-surface-container-lowest border border-outline-variant/40 p-lg rounded-[2.5rem] shadow-sm hover:shadow-md transition-all duration-300 group"
+                        className="bg-surface-container-lowest border border-outline-variant/40 p-lg rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 group"
                       >
                         {/* Question Label Section */}
-                        <div className="flex items-start gap-4 mb-8">
-                          <span className="flex-shrink-0 w-10 h-10 rounded-2xl bg-secondary-container text-on-secondary-container flex items-center justify-center font-black text-sm group-hover:scale-110 transition-transform">
-                            {qId.replace("q_", "").replace("q", "")}
+                        <div className="flex items-start gap-4 mb-6">
+                          <span className="flex-shrink-0 w-10 h-10 rounded-xl bg-secondary-container text-on-secondary-container flex items-center justify-center font-black text-sm group-hover:scale-110 transition-transform">
+                            {idx + 1}
                           </span>
                           <div>
                             <h5 className="font-bold text-on-surface text-md leading-snug">
                               {data.question_label}
                             </h5>
-                            <div className="flex items-center gap-2 mt-2">
+                            <div className="flex items-center gap-2 mt-2 flex-wrap">
                               <span className="text-[9px] uppercase tracking-[0.15em] font-black text-primary bg-primary/5 px-2 py-0.5 rounded-md">
                                 {data.question_type}
                               </span>
@@ -482,12 +482,10 @@ export default function ReportsPage() {
               ) : null}
             </div>
           ) : (
-            <div className="flex-1 min-h-[500px] h-full border-2 border-dashed border-outline-variant/30 rounded-[2.5rem] flex flex-col items-center justify-center text-outline bg-surface-container-lowest/40 backdrop-blur-sm p-xl">
+            <div className="flex-1 min-h-[500px] h-full border-2 border-dashed border-outline-variant/30 rounded-2xl flex flex-col items-center justify-center text-outline bg-surface-container-lowest/40 backdrop-blur-sm p-xl">
               <div className="relative">
-                {/* Vòng tròn trang trí phía sau biểu tượng */}
                 <div className="absolute inset-0 bg-primary/5 rounded-full scale-[1.8] blur-xl" />
-
-                <div className="relative w-20 h-20 bg-surface-container rounded-3xl flex items-center justify-center mb-6 shadow-sm border border-outline-variant/20">
+                <div className="relative w-20 h-20 bg-surface-container rounded-2xl flex items-center justify-center mb-6 shadow-sm border border-outline-variant/20">
                   <span className="material-symbols-outlined text-5xl text-primary/40">
                     analytics
                   </span>
@@ -503,7 +501,6 @@ export default function ReportsPage() {
                 khám phá các số liệu thống kê chi tiết.
               </p>
 
-              {/* Một vài gợi ý nhỏ phía dưới để làm đẹp UI */}
               <div className="mt-8 flex gap-2">
                 <div className="w-2 h-2 rounded-full bg-primary/20" />
                 <div className="w-2 h-2 rounded-full bg-primary/10" />

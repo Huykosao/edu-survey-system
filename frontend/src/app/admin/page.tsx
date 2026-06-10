@@ -251,7 +251,7 @@ export default function AdminDashboardPage() {
             </div>
             <a
               href="/admin/reports"
-              className="mt-md text-[13px] font-bold text-inverse-primary hover:underline flex items-center gap-1 self-start cursor-pointer"
+              className="mt-md text-[13px] font-bold text-inverse-primary hover:opacity-80 flex items-center gap-1 self-start cursor-pointer transition-opacity"
             >
               Xem toàn bộ phân tích AI <span className="material-symbols-outlined text-[16px]">arrow_right_alt</span>
             </a>
