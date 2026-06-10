@@ -78,7 +78,7 @@ export default function UserManagementPage() {
         status: apiStatus,
         page: currentPage,
         limit: ITEMS_PER_PAGE,
-        search: debouncedSearchQuery || undefined,
+        search: debouncedSearchQuery.trim() || undefined,
       });
 
       // Redirect to the last valid page if the current page has no users but there are users elsewhere
