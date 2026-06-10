@@ -484,3 +484,47 @@ export const improvementsApi = {
   get: (id: number) =>
     apiFetch<Record<string, unknown>>(`/api/improvements/${id}`),
 };
+
+// =============================================================
+// AI Analysis API
+// =============================================================
+export const aiApi = {
+  /** Chạy AI gán nhãn cho khảo sát */
+  classify: (surveyId: number, roleId?: number) => {
+    const qs = roleId ? `?role_id=${roleId}` : "";
+    return apiFetch<{ message: string }>(
+      `/api/surveys/${surveyId}/ai-classify${qs}`,
+      { method: "POST" },
+    );
+  },
+
+  /** Chạy AI tạo báo cáo phân tích xu hướng */
+  generateReport: (surveyId: number) =>
+    apiFetch<Record<string, unknown>>(`/api/surveys/${surveyId}/ai-report`, {
+      method: "POST",
+    }),
+
+  /** Lấy báo cáo AI đã lưu */
+  getReport: (surveyId: number) =>
+    apiFetch<Record<string, unknown> | null>(
+      `/api/surveys/${surveyId}/ai-report`,
+    ),
+
+  /** Lấy tổng quan AI (nhãn, sentiment) */
+  getOverview: (surveyId: number) =>
+    apiFetch<Record<string, unknown>>(`/api/surveys/${surveyId}/ai-overview`),
+};
+
+// =============================================================
+// Labels API
+// =============================================================
+export const labelsApi = {
+  listByRole: (roleId: number) =>
+    apiFetch<Record<string, unknown>>(`/api/label/${roleId}`),
+
+  create: (data: { role_id: number; label_name: string }) =>
+    apiFetch<Record<string, unknown>>("/api/label", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+};

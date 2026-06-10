@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
-from typing import Optional
+from typing import Optional, List
 
 from src.core.middleware import require_admin_or_manager
 from src.models.auth import MessageResponse
@@ -8,6 +8,8 @@ from src.services.ai import (
     classify_survey_process,
     generate_trend_analysis
 )
+from src.repositories import ai_report as ai_report_repo
+from src.core.database import supabase_client
 
 router = APIRouter(
     prefix="/api/surveys",
@@ -20,7 +22,6 @@ router = APIRouter(
 @router.post("/{survey_id}/ai-classify", response_model=MessageResponse)
 def run_ai_classification(
     survey_id: int,
-    # Chuyển từ role (string) sang role_id (int) và để Optional
     role_id: Optional[int] = Query(
         None, 
         description="ID của Role để lấy nhãn. Nếu để trống, hệ thống tự lấy từ cấu hình khảo sát."
@@ -33,7 +34,6 @@ def run_ai_classification(
     [MANAGER, ADMIN]
     """
     try:
-        # Gọi service với role_id (có thể là None để service tự xử lý)
         count = classify_survey_process(survey_id, role_id)
         
         if count == 0:
@@ -45,7 +45,6 @@ def run_ai_classification(
             "message": f"AI đã hoàn thành phân loại {count} nhãn cho bài khảo sát #{survey_id}."
         }
     except ValueError as ve:
-        # Bắt các lỗi logic như không tìm thấy Survey hoặc Role ID
         raise HTTPException(status_code=400, detail=str(ve))
     except Exception as e:
         raise HTTPException(
@@ -76,3 +75,55 @@ def run_ai_trend_analysis(
             status_code=500, 
             detail=f"Lỗi khi khởi tạo AI Report: {str(e)}"
         )
+
+
+# ── GET Saved AI Report ───────────────────────────────────────────────────────
+
+@router.get("/{survey_id}/ai-report")
+def get_ai_report(
+    survey_id: int,
+    _: dict = Depends(require_admin_or_manager)
+):
+    """
+    Lấy báo cáo AI đã lưu gần nhất của khảo sát.
+    [MANAGER, ADMIN]
+    """
+    try:
+        result = (
+            supabase_client
+            .table("survey_reports")
+            .select("*")
+            .eq("survey_id", survey_id)
+            .order("created_at", desc=True)
+            .limit(1)
+            .execute()
+        )
+        if not result.data:
+            return None
+        return result.data[0]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Lỗi khi lấy báo cáo AI: {str(e)}")
+
+
+# ── GET AI Dashboard Overview ─────────────────────────────────────────────────
+
+@router.get("/{survey_id}/ai-overview")
+def get_ai_overview(
+    survey_id: int,
+    _: dict = Depends(require_admin_or_manager)
+):
+    """
+    Lấy thông tin tổng quan AI (số nhãn, sentiment, số phản hồi mở) của khảo sát.
+    [MANAGER, ADMIN]
+    """
+    try:
+        overview = ai_report_repo.get_dashboard_overview(survey_id)
+        label_summary = ai_report_repo.get_label_sentiment_summary(survey_id)
+        question_summary = ai_report_repo.get_question_sentiment_summary(survey_id)
+        return {
+            "overview": overview,
+            "label_summary": label_summary,
+            "question_summary": question_summary,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Lỗi khi lấy tổng quan AI: {str(e)}")
