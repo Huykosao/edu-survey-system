@@ -89,6 +89,8 @@ export default function AdminLayout({
           }
         })
         .catch(err => console.error("Failed to fetch unread notifications", err));
+    } else {
+      setHasUnreadNotifications(false);
     }
   }, [isAuthenticated, pathname]);
 
