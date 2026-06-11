@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { surveysApi } from "@/lib/api";
 import {
   BarChart,
@@ -237,6 +238,8 @@ const OpenEndedList = ({ stats }: { stats: any }) => (
 
 // --- COMPONENT CHÍNH ---
 export default function ReportsPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedReport, setSelectedReport] = useState<any>(null);
@@ -247,16 +250,33 @@ export default function ReportsPage() {
   useEffect(() => {
     surveysApi
       .list({ status: "published" })
-      .then((res: any) => setReports(res.data || []))
+      .then((res: any) => {
+        const data = res.data || [];
+        setReports(data);
+
+        // Khôi phục selectedReport từ URL nếu có
+        const idFromUrl = searchParams.get("sid");
+        if (idFromUrl && !selectedReport) {
+          const found = data.find((r: any) => String(r.id) === idFromUrl);
+          if (found) setSelectedReport(found);
+        }
+      })
       .catch(console.error)
       .finally(() => setLoading(false));
   }, []);
 
-  // Lấy phân tích chi tiết
+  // Lấy phân tích chi tiết + lưu trạng thái vào URL
   useEffect(() => {
     if (selectedReport) {
       setIsAnalysing(true);
       setAnalysis(null);
+
+      // Lưu survey ID vào URL để khôi phục khi F5
+      const currentSid = searchParams.get("sid");
+      if (currentSid !== String(selectedReport.id)) {
+        router.replace(`?sid=${selectedReport.id}`, { scroll: false });
+      }
+
       surveysApi
         .getAnalysis(selectedReport.id)
         .then((res: any) => setAnalysis(res))
@@ -296,8 +316,9 @@ export default function ReportsPage() {
     if (!analysis || !selectedReport) return;
 
     try {
-      // Nhập động exceljs để tối ưu thời gian tải trang ban đầu
-      const ExcelJS = (await import("exceljs")).default;
+      // Nhập động exceljs từ phiên bản minified cho trình duyệt để tránh lỗi module Node.js
+      // @ts-ignore
+      const ExcelJS = (await import("exceljs/dist/exceljs.min.js")).default || await import("exceljs/dist/exceljs.min.js");
 
       const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet("Báo cáo phân tích", {
@@ -308,7 +329,6 @@ export default function ReportsPage() {
     sheet.columns = [
       { header: "", key: "cauSo", width: 15 },
       { header: "", key: "noiDung", width: 90 }, // Tăng độ rộng cột Nội dung
-      { header: "", key: "loai", width: 18 },
       { header: "", key: "val1", width: 18 },
       { header: "", key: "val2", width: 18 },
       { header: "", key: "val3", width: 18 },
@@ -321,7 +341,7 @@ export default function ReportsPage() {
 
     // --- TIÊU ĐỀ BÁO CÁO ---
     const titleRow = sheet.addRow(["BÁO CÁO PHÂN TÍCH: " + (selectedReport.title || "").toUpperCase()]);
-    sheet.mergeCells(titleRow.number, 1, titleRow.number, 8);
+    sheet.mergeCells(titleRow.number, 1, titleRow.number, 7);
     titleRow.height = 40;
     const titleCell = titleRow.getCell(1);
     titleCell.font = { name: "Arial", size: 16, bold: true, color: { argb: "FFFFFFFF" } };
@@ -330,27 +350,36 @@ export default function ReportsPage() {
 
     // --- TỔNG QUAN ---
     const overviewTitleRow = sheet.addRow(["1. TỔNG QUAN CHIẾN DỊCH"]);
-    sheet.mergeCells(overviewTitleRow.number, 1, overviewTitleRow.number, 8);
+    sheet.mergeCells(overviewTitleRow.number, 1, overviewTitleRow.number, 7);
     overviewTitleRow.height = 30;
     const overviewTitleCell = overviewTitleRow.getCell(1);
     overviewTitleCell.font = { name: "Arial", size: 12, bold: true, color: { argb: "FF0058BE" } };
     overviewTitleCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF3F4F6" } };
     overviewTitleCell.alignment = { vertical: "middle", horizontal: "left" };
 
-    const tr1 = sheet.addRow({ cauSo: "", noiDung: "Tổng số phản hồi", loai: analysis.total_responses ?? 0 });
-    const tr2 = sheet.addRow({ cauSo: "", noiDung: "CSAT (Hài lòng tổng thể)", loai: overviewStats?.globalCSAT ? `${overviewStats.globalCSAT}/5.0` : "Không áp dụng" });
-    const tr3 = sheet.addRow({ cauSo: "", noiDung: "NPS (Chỉ số trung thành)", loai: overviewStats?.npsScore ?? "Không áp dụng" });
+    const tr1 = sheet.addRow({ cauSo: "", noiDung: "Tổng số phản hồi", val1: analysis.total_responses ?? 0 });
+    const tr2 = sheet.addRow({ cauSo: "", noiDung: "CSAT (Hài lòng tổng thể)", val1: overviewStats?.globalCSAT ? `${overviewStats.globalCSAT}/5.0` : "Không áp dụng" });
+    const tr3 = sheet.addRow({ cauSo: "", noiDung: "NPS (Chỉ số trung thành)", val1: overviewStats?.npsScore ?? "Không áp dụng" });
     
-    // Làm đậm cột B trong phần tổng quan (động)
-    tr1.getCell(2).font = { bold: true };
-    tr2.getCell(2).font = { bold: true };
-    tr3.getCell(2).font = { bold: true };
+    // Làm đậm cột B và vẽ viền cho phần tổng quan (động)
+    const overviewBorder = {
+      top: { style: "thin", color: { argb: "FFC5C5D3" } },
+      left: { style: "thin", color: { argb: "FFC5C5D3" } },
+      bottom: { style: "thin", color: { argb: "FFC5C5D3" } },
+      right: { style: "thin", color: { argb: "FFC5C5D3" } },
+    };
+    [tr1, tr2, tr3].forEach((row: any) => {
+      row.getCell(2).font = { bold: true };
+      for (let c = 1; c <= 7; c++) {
+        row.getCell(c).border = overviewBorder;
+      }
+    });
 
     sheet.addRow([]); // Dòng trống
     
     // --- CHI TIẾT ---
     const detailsTitleRow = sheet.addRow(["2. PHÂN TÍCH CHI TIẾT TỪNG CÂU HỎI"]);
-    sheet.mergeCells(detailsTitleRow.number, 1, detailsTitleRow.number, 8);
+    sheet.mergeCells(detailsTitleRow.number, 1, detailsTitleRow.number, 7);
     detailsTitleRow.height = 30;
     const detailsTitleCell = detailsTitleRow.getCell(1);
     detailsTitleCell.font = { name: "Arial", size: 12, bold: true, color: { argb: "FF0058BE" } };
@@ -361,7 +390,6 @@ export default function ReportsPage() {
     const headerRow = sheet.addRow({
       cauSo: "CÂU SỐ",
       noiDung: "NỘI DUNG / THỐNG KÊ CHI TIẾT",
-      loai: "THỂ LOẠI",
       val1: "GIÁ TRỊ 1",
       val2: "GIÁ TRỊ 2",
       val3: "GIÁ TRỊ 3",
@@ -369,7 +397,7 @@ export default function ReportsPage() {
       val5: "GIÁ TRỊ 5",
     });
     
-    headerRow.eachCell((cell) => {
+    headerRow.eachCell((cell: any) => {
       cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
       cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF757682" } };
       cell.alignment = { vertical: "middle", horizontal: "center" };
@@ -390,7 +418,6 @@ export default function ReportsPage() {
       const qRow = sheet.addRow({
         cauSo: `Câu ${idx++}`,
         noiDung: q.question_label,
-        loai: q.question_type,
       });
       qRow.font = { bold: true };
       qRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFEDEEF0" } };
@@ -399,10 +426,10 @@ export default function ReportsPage() {
         sheet.addRow({
           noiDung: "→ Điểm TB & Phân bổ (Mức 1 đến 5)",
           val1: `TB: ${q.stats?.average ?? "Không áp dụng"}`,
-          val2: `Mức 1: ${q.stats?.distribution?.["1"] || 0}`,
-          val3: `Mức 2: ${q.stats?.distribution?.["2"] || 0}`,
-          val4: `Mức 3: ${q.stats?.distribution?.["3"] || 0}`,
-          val5: "Mức 4/5: " + (Number(q.stats?.distribution?.["4"] || 0) + Number(q.stats?.distribution?.["5"] || 0))
+          val2: `Mức 1: ${q.stats?.score_distribution?.["1"] ?? q.stats?.distribution?.["1"] ?? 0}`,
+          val3: `Mức 2: ${q.stats?.score_distribution?.["2"] ?? q.stats?.distribution?.["2"] ?? 0}`,
+          val4: `Mức 3: ${q.stats?.score_distribution?.["3"] ?? q.stats?.distribution?.["3"] ?? 0}`,
+          val5: "Mức 4/5: " + (Number(q.stats?.score_distribution?.["4"] ?? q.stats?.distribution?.["4"] ?? 0) + Number(q.stats?.score_distribution?.["5"] ?? q.stats?.distribution?.["5"] ?? 0))
         });
       } else if (q.question_type === "nps") {
          sheet.addRow({
@@ -413,7 +440,8 @@ export default function ReportsPage() {
           val4: `Phản đối: ${q.stats?.distribution?.detractors || 0}`,
         });
       } else if (q.question_type === "single_choice" || q.question_type === "multiple_choice") {
-        for (const [opt, count] of Object.entries(q.stats?.counts || {})) {
+        for (const [opt, value] of Object.entries(q.stats?.distribution || {})) {
+          const count = typeof value === "object" ? (value as any).count : value;
           sheet.addRow({ noiDung: `   • ${opt}`, val1: `Chọn: ${count}` });
         }
       } else if (q.question_type === "matrix") {
@@ -441,10 +469,10 @@ export default function ReportsPage() {
     }
 
     // Đóng khung tất cả các ô có dữ liệu ở phần chi tiết
-    sheet.eachRow((row, rowNumber) => {
+    sheet.eachRow((row: any, rowNumber: number) => {
       if (rowNumber > detailsStartRowNumber) {
         if (row.cellCount > 0) {
-          for (let colIdx = 1; colIdx <= 8; colIdx++) {
+          for (let colIdx = 1; colIdx <= 7; colIdx++) {
             const cell = row.getCell(colIdx);
             cell.border = {
               top: { style: "thin", color: { argb: "FFC5C5D3" } },

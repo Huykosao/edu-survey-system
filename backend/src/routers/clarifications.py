@@ -4,7 +4,7 @@ routers/clarifications.py  (v2 — typed request/response models)
 
 from fastapi import APIRouter, Depends
 from src.core.security import get_current_user
-from src.core.middleware import require_manager, require_lecturer
+from src.core.middleware import require_admin_or_manager, require_lecturer
 from src.models.clarification import (
     CreateClarificationRequest,
     SubmitClarificationRequest,
@@ -34,7 +34,7 @@ router = APIRouter(
 # ── Manager endpoints ─────────────────────────────────────────────────────────
 
 @router.get("/clarifications", response_model=list[ClarificationResponse])
-def list_clarifications(_: dict = Depends(require_manager)):
+def list_clarifications(_: dict = Depends(require_admin_or_manager)):
     """Danh sách tất cả yêu cầu giải trình. [MANAGER, ADMIN]"""
     return list_all_clarifications()
 
@@ -42,14 +42,14 @@ def list_clarifications(_: dict = Depends(require_manager)):
 @router.post("/clarifications", response_model=ClarificationResponse)
 def create_clarification(
     req: CreateClarificationRequest,
-    current_user: dict = Depends(require_manager),
+    current_user: dict = Depends(require_admin_or_manager),
 ):
     """Manager tạo yêu cầu giải trình gửi Lecturer. [MANAGER, ADMIN]"""
-    return clar_svc.request_clarification(req.model_dump(), current_user["id"])
+    return clar_svc.request_clarification(req.model_dump(mode="json"), current_user["id"])
 
 
 @router.post("/clarifications/{cid}/approve", response_model=ClarificationResponse)
-def approve_clarification(cid: int, _: dict = Depends(require_manager)):
+def approve_clarification(cid: int, _: dict = Depends(require_admin_or_manager)):
     """Manager duyệt giải trình. [MANAGER, ADMIN]"""
     return clar_svc.approve_clarification(cid)
 
@@ -58,20 +58,20 @@ def approve_clarification(cid: int, _: dict = Depends(require_manager)):
 def reject_clarification(
     cid: int,
     req: RejectClarificationRequest,
-    _: dict = Depends(require_manager),
+    _: dict = Depends(require_admin_or_manager),
 ):
     """Manager từ chối giải trình. [MANAGER, ADMIN]"""
     return clar_svc.reject_clarification(cid, req.admin_comment)
 
 
 @router.get("/responses-to-students/pending", response_model=list[LecturerResponseItem])
-def list_pending_responses(_: dict = Depends(require_manager)):
+def list_pending_responses(_: dict = Depends(require_admin_or_manager)):
     """Danh sách phản hồi Lecturer chờ duyệt. [MANAGER, ADMIN]"""
     return list_pending_lecturer_responses()
 
 
 @router.post("/responses-to-students/{rid}/approve", response_model=LecturerResponseItem)
-def approve_response(rid: int, current_user: dict = Depends(require_manager)):
+def approve_response(rid: int, current_user: dict = Depends(require_admin_or_manager)):
     """Manager duyệt phản hồi của Lecturer cho sinh viên. [MANAGER, ADMIN]"""
     return approve_lecturer_response(rid, current_user["id"])
 

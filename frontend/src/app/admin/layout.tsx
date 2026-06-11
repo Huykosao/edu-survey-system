@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+import { notificationsApi } from "@/lib/api";
 
 export default function AdminLayout({
   children,
@@ -15,6 +16,7 @@ export default function AdminLayout({
   const { user, isAuthenticated, isLoading, logout } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [hasUnreadNotifications, setHasUnreadNotifications] = useState(false);
 
   const roles = user?.roles || [];
   const primaryRole = roles[0] || "";
@@ -74,6 +76,21 @@ export default function AdminLayout({
     isTryingManagerPath,
     isTryingLecturerPath,
   ]);
+
+  // Fetch unread notifications
+  useEffect(() => {
+    if (isAuthenticated) {
+      notificationsApi.unread()
+        .then(res => {
+          if (Array.isArray(res) && res.length > 0) {
+            setHasUnreadNotifications(true);
+          } else {
+            setHasUnreadNotifications(false);
+          }
+        })
+        .catch(err => console.error("Failed to fetch unread notifications", err));
+    }
+  }, [isAuthenticated, pathname]);
 
   // Define sidebar menu based on roles
   const getMenuItems = () => {
@@ -251,7 +268,9 @@ export default function AdminLayout({
             <span className="material-symbols-outlined text-[22px]">
               notifications
             </span>
-            <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-error rounded-full border-2 border-surface-container-lowest"></span>
+            {hasUnreadNotifications && (
+              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-error rounded-full border-2 border-surface-container-lowest"></span>
+            )}
           </Link>
 
           {/* Divider */}

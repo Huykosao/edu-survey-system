@@ -262,7 +262,7 @@ def insert_ai_report(survey_id: int, report_data: dict):
     payload = {
         "survey_id": survey_id,
         "summary_text": report_data.get("executive_summary"),
-        "key_findings": report_data.get("detailed_trends"), # JSONB
+        "key_findings": report_data.get("detailed_analysis"), # JSONB — matches FinalSurveyReport.detailed_analysis
         "recommendations": report_data.get("overall_recommendation")
     }
     return supabase_client.table("survey_reports").insert(payload).execute()

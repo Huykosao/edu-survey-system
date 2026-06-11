@@ -40,7 +40,7 @@ export default function ClarificationCenterPage() {
       const surveyRes: any = await surveysApi.list();
       setSurveys(surveyRes.data || []);
 
-      const userRes: any = await usersApi.list({ role: "Giảng viên" });
+      const userRes: any = await usersApi.list({ role: "LECTURER", limit: 100 });
       setLecturers(userRes.data || []);
 
       const tasksRes: any = await clarificationsApi.listAll();
