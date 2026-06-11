@@ -30,10 +30,10 @@ def classify_survey_process(survey_id: int, role_id: int = None):
                 role_map = {
                     "ADMIN": 1,
                     "MANAGER": 2,
-                    "LECTURER": 3,
+                    "LECTURER": 2,
+                    "ALUMNI": 3,
                     "STUDENT": 4,
-                    "ALUMNI": 5,
-                    "EMPLOYER": 6
+                    "EMPLOYER": 5
                 }
                 role_id = role_map.get(str(role_name).upper())
     
