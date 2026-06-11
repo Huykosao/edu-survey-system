@@ -189,33 +189,38 @@ export default function UserManagementPage() {
   };
 
   const handleDownloadTemplate = async () => {
-    // @ts-ignore
-    const exceljsModule = await import("exceljs/dist/exceljs.min.js");
-    const ExcelJS = exceljsModule.default || exceljsModule;
-    const workbook = new ExcelJS.Workbook();
-    const sheet = workbook.addWorksheet("Users Template");
-    
-    sheet.columns = [
-      { header: "Mật khẩu", key: "password", width: 15 },
-      { header: "Họ và tên", key: "name", width: 25 },
-      { header: "Email", key: "email", width: 30 },
-      { header: "Số điện thoại", key: "phone", width: 15 },
-      { header: "Khoa", key: "faculty", width: 25 }
-    ];
-    
-    sheet.addRow({ password: "matkhau123", name: "Nguyễn Văn A", email: "nva@example.com", phone: "0987654321", faculty: "Công nghệ thông tin" });
-    sheet.addRow({ password: "matkhau456", name: "Trần Thị B", email: "ttb@example.com", phone: "0912345678", faculty: "Kinh tế" });
-    
-    const buffer = await workbook.xlsx.writeBuffer();
-    const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-    const url = window.URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = "Mau_nhap_nguoi_dung.xlsx";
-    document.body.appendChild(anchor);
-    anchor.click();
-    document.body.removeChild(anchor);
-    setTimeout(() => window.URL.revokeObjectURL(url), 1000);
+    try {
+      // @ts-ignore
+      const exceljsModule = await import("exceljs/dist/exceljs.min.js");
+      const ExcelJS = exceljsModule.default || exceljsModule;
+      const workbook = new ExcelJS.Workbook();
+      const sheet = workbook.addWorksheet("Users Template");
+      
+      sheet.columns = [
+        { header: "Mật khẩu", key: "password", width: 15 },
+        { header: "Họ và tên", key: "name", width: 25 },
+        { header: "Email", key: "email", width: 30 },
+        { header: "Số điện thoại", key: "phone", width: 15 },
+        { header: "Khoa", key: "faculty", width: 25 }
+      ];
+      
+      sheet.addRow({ password: "matkhau123", name: "Nguyễn Văn A", email: "nva@example.com", phone: "0987654321", faculty: "Công nghệ thông tin" });
+      sheet.addRow({ password: "matkhau456", name: "Trần Thị B", email: "ttb@example.com", phone: "0912345678", faculty: "Kinh tế" });
+      
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+      const url = window.URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = "Mau_nhap_nguoi_dung.xlsx";
+      document.body.appendChild(anchor);
+      anchor.click();
+      document.body.removeChild(anchor);
+      setTimeout(() => window.URL.revokeObjectURL(url), 1000);
+    } catch (error) {
+      console.error("Lỗi khi tải template Excel:", error);
+      alert("Đã xảy ra lỗi khi tạo file Excel mẫu. Vui lòng thử lại sau.");
+    }
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
