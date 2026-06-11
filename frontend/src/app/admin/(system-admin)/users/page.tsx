@@ -250,7 +250,15 @@ export default function UserManagementPage() {
           row.eachCell((cell: any, colNumber: number) => {
             const header = headers[colNumber];
             if (header && cell.value !== undefined && cell.value !== null) {
-              rowData[header] = cell.value;
+              let val = cell.value;
+              if (typeof val === "object") {
+                if (val.result !== undefined) val = val.result;
+                else if (val.text !== undefined) val = val.text;
+                else if (val.richText) val = val.richText.map((t: any) => t.text).join("");
+                else if (val instanceof Date) val = val.toISOString();
+                else val = val.toString();
+              }
+              rowData[header] = val;
               hasData = true;
             }
           });

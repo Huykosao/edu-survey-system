@@ -259,13 +259,14 @@ def get_labeled_feedbacks_for_report(survey_id: int) -> list[dict]:
     return result.data or []
 
 def insert_ai_report(survey_id: int, report_data: dict):
-    payload = {
+    report_data = report_data or {}
+    data = {
         "survey_id": survey_id,
         "summary_text": report_data.get("executive_summary"),
         "key_findings": report_data.get("detailed_analysis"), # JSONB — matches FinalSurveyReport.detailed_analysis
         "recommendations": report_data.get("overall_recommendation")
     }
-    return supabase_client.table("survey_reports").insert(payload).execute()
+    return supabase_client.table("survey_reports").insert(data).execute()
 
 def get_open_responses_grouped_by_question(survey_id: int):
     """
