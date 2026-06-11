@@ -888,15 +888,15 @@ export default function ReportsPage() {
 
               {/* General Stats Panel */}
               {generalStats && (
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-sm">
+                <div className={`grid grid-cols-2 ${isClosed ? "sm:grid-cols-3 lg:grid-cols-6" : "sm:grid-cols-2 max-w-sm"} gap-sm`}>
                   {[
                     { label: "Phản hồi", value: generalStats.total_responses ?? 0, icon: "group", color: "#6750A4" },
                     { label: "Câu mở", value: generalStats.total_open_feedbacks ?? 0, icon: "chat", color: "#006A60" },
-                    { label: "Nhãn AI", value: generalStats.total_labels ?? 0, icon: "label", color: "#635F70" },
-                    { label: "Tích cực", value: generalStats.positive_count ?? 0, icon: "thumb_up", color: "#4CAF50" },
-                    { label: "Tiêu cực", value: generalStats.negative_count ?? 0, icon: "thumb_down", color: "#f44336" },
-                    { label: "Trung lập", value: generalStats.neutral_count ?? 0, icon: "thumbs_up_down", color: "#9E9E9E" },
-                  ].map(stat => (
+                    isClosed && { label: "Nhãn AI", value: generalStats.total_labels ?? 0, icon: "label", color: "#635F70" },
+                    isClosed && { label: "Tích cực", value: generalStats.positive_count ?? 0, icon: "thumb_up", color: "#4CAF50" },
+                    isClosed && { label: "Tiêu cực", value: generalStats.negative_count ?? 0, icon: "thumb_down", color: "#f44336" },
+                    isClosed && { label: "Trung lập", value: generalStats.neutral_count ?? 0, icon: "thumbs_up_down", color: "#9E9E9E" },
+                  ].filter(Boolean).map((stat: any) => (
                     <div key={stat.label} className="bg-surface-container-lowest border border-outline-variant rounded-xl p-sm flex flex-col items-center gap-1 shadow-sm text-center">
                       <span className="material-symbols-outlined text-xl" style={{ color: stat.color }}>{stat.icon}</span>
                       <span className="text-xl font-black text-on-surface">{stat.value}</span>
