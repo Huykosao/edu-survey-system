@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { surveysApi } from "@/lib/api";
+import { surveysApi, facultiesApi, majorsApi, subjectsApi, usersApi } from "@/lib/api";
 
 interface Survey {
   id: number;
@@ -20,6 +20,12 @@ export default function SurveysManagerPage() {
   const [activeTab, setActiveTab] = useState<"all" | "draft" | "published" | "closed">("all");
   const [showCreateModal, setShowCreateModal] = useState(false);
 
+  // Master Data lists
+  const [faculties, setFaculties] = useState<any[]>([]);
+  const [majors, setMajors] = useState<any[]>([]);
+  const [subjects, setSubjects] = useState<any[]>([]);
+  const [lecturers, setLecturers] = useState<any[]>([]);
+
   // Edit/Builder State
   const [editingSurvey, setEditingSurvey] = useState<Survey | null>(null);
   const [editTitle, setEditTitle] = useState("");
@@ -27,12 +33,20 @@ export default function SurveysManagerPage() {
   const [editIsAnonymous, setEditIsAnonymous] = useState(true);
   const [editTargetRole, setEditTargetRole] = useState("STUDENT");
   const [editSections, setEditSections] = useState<any[]>([]);
+  const [editTargetFacultyId, setEditTargetFacultyId] = useState("");
+  const [editTargetMajorId, setEditTargetMajorId] = useState("");
+  const [editTargetSubjectId, setEditTargetSubjectId] = useState("");
+  const [editTargetLecturerId, setEditTargetLecturerId] = useState("");
 
   // Create Form state
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [isAnonymous, setIsAnonymous] = useState(true);
   const [targetRole, setTargetRole] = useState("STUDENT");
+  const [targetFacultyId, setTargetFacultyId] = useState("");
+  const [targetMajorId, setTargetMajorId] = useState("");
+  const [targetSubjectId, setTargetSubjectId] = useState("");
+  const [targetLecturerId, setTargetLecturerId] = useState("");
 
   const loadSurveys = () => {
     setLoading(true);
@@ -47,11 +61,23 @@ export default function SurveysManagerPage() {
 
   useEffect(() => {
     loadSurveys();
+    
+    // Load Master Data
+    facultiesApi.list().then(res => setFaculties(res || [])).catch(console.error);
+    majorsApi.list().then(res => setMajors(res || [])).catch(console.error);
+    subjectsApi.list().then(res => setSubjects(res || [])).catch(console.error);
+    usersApi.list({ role: "LECTURER", limit: 100 }).then(res => setLecturers(res.data || [])).catch(console.error);
   }, []);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return;
+
+    const targetConfig: Record<string, any> = { role: targetRole };
+    if (targetFacultyId) targetConfig.faculty_id = Number(targetFacultyId);
+    if (targetMajorId) targetConfig.major_id = Number(targetMajorId);
+    if (targetSubjectId) targetConfig.subject_id = Number(targetSubjectId);
+    if (targetLecturerId) targetConfig.lecturer_id = Number(targetLecturerId);
 
     try {
       await surveysApi.create({
@@ -59,7 +85,7 @@ export default function SurveysManagerPage() {
         description,
         is_anonymous: isAnonymous,
         status: "draft",
-        target_config: { role: targetRole },
+        target_config: targetConfig,
         content: {
           sections: [
             {
@@ -91,6 +117,10 @@ export default function SurveysManagerPage() {
       setTitle("");
       setDescription("");
       setIsAnonymous(true);
+      setTargetFacultyId("");
+      setTargetMajorId("");
+      setTargetSubjectId("");
+      setTargetLecturerId("");
       setShowCreateModal(false);
       loadSurveys();
     } catch (err) {
@@ -106,6 +136,10 @@ export default function SurveysManagerPage() {
     setEditDescription(survey.description || "");
     setEditIsAnonymous(survey.is_anonymous);
     setEditTargetRole(survey.target_config?.role || "STUDENT");
+    setEditTargetFacultyId(survey.target_config?.faculty_id ? String(survey.target_config.faculty_id) : "");
+    setEditTargetMajorId(survey.target_config?.major_id ? String(survey.target_config.major_id) : "");
+    setEditTargetSubjectId(survey.target_config?.subject_id ? String(survey.target_config.subject_id) : "");
+    setEditTargetLecturerId(survey.target_config?.lecturer_id ? String(survey.target_config.lecturer_id) : "");
     
     const content = survey.content || {};
     const sectionsList = content.sections || [
@@ -124,12 +158,18 @@ export default function SurveysManagerPage() {
     if (!editingSurvey) return;
     if (!editTitle.trim()) return;
 
+    const targetConfig: Record<string, any> = { role: editTargetRole };
+    if (editTargetFacultyId) targetConfig.faculty_id = Number(editTargetFacultyId);
+    if (editTargetMajorId) targetConfig.major_id = Number(editTargetMajorId);
+    if (editTargetSubjectId) targetConfig.subject_id = Number(editTargetSubjectId);
+    if (editTargetLecturerId) targetConfig.lecturer_id = Number(editTargetLecturerId);
+
     try {
       await surveysApi.update(editingSurvey.id, {
         title: editTitle,
         description: editDescription,
         is_anonymous: editIsAnonymous,
-        target_config: { role: editTargetRole },
+        target_config: targetConfig,
         content: {
           sections: editSections
         }
@@ -517,7 +557,7 @@ export default function SurveysManagerPage() {
       {showCreateModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-md">
           <div className="fixed inset-0 bg-black/45 backdrop-blur-sm" onClick={() => setShowCreateModal(false)}></div>
-          <div className="relative bg-surface rounded-xl border border-outline-variant/30 shadow-2xl p-xl max-w-[480px] w-full flex flex-col gap-md z-10 animate-in fade-in zoom-in-95 duration-200">
+          <div className="relative bg-surface rounded-xl border border-outline-variant/30 shadow-2xl p-xl max-w-[520px] w-full flex flex-col gap-md z-10 animate-in fade-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
             <h3 className="font-headline-md text-headline-md text-primary font-bold border-b border-outline-variant/40 pb-sm mb-sm">
               Thiết kế Khảo sát Mới
             </h3>
@@ -559,6 +599,59 @@ export default function SurveysManagerPage() {
                   <option value="LECTURER">Giảng viên</option>
                 </select>
               </div>
+
+              {/* School entity linkage */}
+              <div className="bg-surface-container-low p-md rounded-xl border border-outline-variant/40 space-y-sm">
+                <p className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Gắn đối tượng trường (tuỳ chọn)</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-sm">
+                  <div className="flex flex-col gap-xs">
+                    <label className="text-xs font-semibold text-on-surface-variant">Khoa</label>
+                    <select
+                      value={targetFacultyId}
+                      onChange={(e) => { setTargetFacultyId(e.target.value); setTargetMajorId(""); }}
+                      className="w-full p-2 bg-surface-container-lowest border border-outline-variant rounded-lg text-xs focus:border-primary focus:outline-none"
+                    >
+                      <option value="">-- Không chọn --</option>
+                      {faculties.map((f: any) => <option key={f.id} value={f.id}>{f.name}</option>)}
+                    </select>
+                  </div>
+                  <div className="flex flex-col gap-xs">
+                    <label className="text-xs font-semibold text-on-surface-variant">Ngành</label>
+                    <select
+                      value={targetMajorId}
+                      onChange={(e) => setTargetMajorId(e.target.value)}
+                      className="w-full p-2 bg-surface-container-lowest border border-outline-variant rounded-lg text-xs focus:border-primary focus:outline-none"
+                      disabled={!targetFacultyId}
+                    >
+                      <option value="">-- Không chọn --</option>
+                      {majors.filter((m: any) => !targetFacultyId || String(m.faculty_id) === targetFacultyId).map((m: any) => <option key={m.id} value={m.id}>{m.name}</option>)}
+                    </select>
+                  </div>
+                  <div className="flex flex-col gap-xs">
+                    <label className="text-xs font-semibold text-on-surface-variant">Môn học</label>
+                    <select
+                      value={targetSubjectId}
+                      onChange={(e) => setTargetSubjectId(e.target.value)}
+                      className="w-full p-2 bg-surface-container-lowest border border-outline-variant rounded-lg text-xs focus:border-primary focus:outline-none"
+                    >
+                      <option value="">-- Không chọn --</option>
+                      {subjects.filter((s: any) => !targetFacultyId || String(s.faculty_id) === targetFacultyId).map((s: any) => <option key={s.id} value={s.id}>{s.name} ({s.code})</option>)}
+                    </select>
+                  </div>
+                  <div className="flex flex-col gap-xs">
+                    <label className="text-xs font-semibold text-on-surface-variant">Giảng viên phụ trách</label>
+                    <select
+                      value={targetLecturerId}
+                      onChange={(e) => setTargetLecturerId(e.target.value)}
+                      className="w-full p-2 bg-surface-container-lowest border border-outline-variant rounded-lg text-xs focus:border-primary focus:outline-none"
+                    >
+                      <option value="">-- Không chọn --</option>
+                      {lecturers.map((l: any) => <option key={l.id} value={l.id}>{l.full_name}</option>)}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
               <label className="flex items-center gap-md cursor-pointer select-none">
                 <input
                   type="checkbox"
@@ -642,6 +735,59 @@ export default function SurveysManagerPage() {
                     className="p-2 bg-surface-container-lowest border border-outline-variant rounded-lg font-body-md focus:border-primary focus:outline-none resize-none"
                   />
                 </div>
+
+                {/* School entity linkage for editing */}
+                <div className="md:col-span-2 space-y-sm">
+                  <p className="text-xs font-bold text-on-surface-variant uppercase tracking-wider border-t border-outline-variant/40 pt-sm">Gắn đối tượng trường (tuỳ chọn)</p>
+                  <div className="grid grid-cols-2 gap-sm">
+                    <div className="flex flex-col gap-xs">
+                      <label className="text-xs font-semibold text-on-surface-variant">Khoa</label>
+                      <select
+                        value={editTargetFacultyId}
+                        onChange={(e) => { setEditTargetFacultyId(e.target.value); setEditTargetMajorId(""); }}
+                        className="p-2 bg-surface-container-lowest border border-outline-variant rounded-lg text-xs focus:border-primary focus:outline-none"
+                      >
+                        <option value="">-- Không chọn --</option>
+                        {faculties.map((f: any) => <option key={f.id} value={f.id}>{f.name}</option>)}
+                      </select>
+                    </div>
+                    <div className="flex flex-col gap-xs">
+                      <label className="text-xs font-semibold text-on-surface-variant">Ngành</label>
+                      <select
+                        value={editTargetMajorId}
+                        onChange={(e) => setEditTargetMajorId(e.target.value)}
+                        className="p-2 bg-surface-container-lowest border border-outline-variant rounded-lg text-xs focus:border-primary focus:outline-none"
+                        disabled={!editTargetFacultyId}
+                      >
+                        <option value="">-- Không chọn --</option>
+                        {majors.filter((m: any) => !editTargetFacultyId || String(m.faculty_id) === editTargetFacultyId).map((m: any) => <option key={m.id} value={m.id}>{m.name}</option>)}
+                      </select>
+                    </div>
+                    <div className="flex flex-col gap-xs">
+                      <label className="text-xs font-semibold text-on-surface-variant">Môn học</label>
+                      <select
+                        value={editTargetSubjectId}
+                        onChange={(e) => setEditTargetSubjectId(e.target.value)}
+                        className="p-2 bg-surface-container-lowest border border-outline-variant rounded-lg text-xs focus:border-primary focus:outline-none"
+                      >
+                        <option value="">-- Không chọn --</option>
+                        {subjects.filter((s: any) => !editTargetFacultyId || String(s.faculty_id) === editTargetFacultyId).map((s: any) => <option key={s.id} value={s.id}>{s.name} ({s.code})</option>)}
+                      </select>
+                    </div>
+                    <div className="flex flex-col gap-xs">
+                      <label className="text-xs font-semibold text-on-surface-variant">Giảng viên phụ trách</label>
+                      <select
+                        value={editTargetLecturerId}
+                        onChange={(e) => setEditTargetLecturerId(e.target.value)}
+                        className="p-2 bg-surface-container-lowest border border-outline-variant rounded-lg text-xs focus:border-primary focus:outline-none"
+                      >
+                        <option value="">-- Không chọn --</option>
+                        {lecturers.map((l: any) => <option key={l.id} value={l.id}>{l.full_name}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="md:col-span-2">
                   <label className="flex items-center gap-md cursor-pointer select-none">
                     <input

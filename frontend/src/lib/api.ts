@@ -397,6 +397,8 @@ export const surveysApi = {
       `/api/surveys/${id}/analysis${qs ? `?${qs}` : ""}`,
     );
   },
+  getGeneralStats: (id: number) =>
+    apiFetch<Record<string, unknown>>(`/api/surveys/${id}/general-stats`),
 };
 
 // =============================================================
@@ -550,6 +552,10 @@ export const aiApi = {
   /** Lấy tổng quan AI (nhãn, sentiment) */
   getOverview: (surveyId: number) =>
     apiFetch<Record<string, unknown>>(`/api/surveys/${surveyId}/ai-overview`),
+
+  /** Lấy danh sách phản hồi theo nhãn */
+  getFeedbackByLabel: (surveyId: number) =>
+    apiFetch<Record<string, any[]>>(`/api/surveys/${surveyId}/ai-feedback-by-label`),
 };
 
 // =============================================================

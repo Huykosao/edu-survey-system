@@ -114,6 +114,7 @@ def get_ai_overview(
 ):
     """
     Lấy thông tin tổng quan AI (số nhãn, sentiment, số phản hồi mở) của khảo sát.
+    Bao gồm cả label_summary (phân tích theo nhãn) và question_sentiment_summary.
     [MANAGER, ADMIN]
     """
     try:
@@ -126,4 +127,35 @@ def get_ai_overview(
             "question_summary": question_summary,
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Lỗi khi lấy tổng quan AI: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Lỗi khi lấy tổng quan AI: {str(e)}")
+
+
+# ── GET Feedbacks Grouped By Label ──────────────────────────────────────────
+
+@router.get("/{survey_id}/ai-feedback-by-label")
+def get_ai_feedback_by_label(
+    survey_id: int,
+    _: dict = Depends(require_admin_or_manager)
+):
+    """
+    Lấy danh sách các phản hồi mở được gom nhóm theo nhãn AI đã gán.
+    [MANAGER, ADMIN]
+    """
+    try:
+        feedbacks = ai_report_repo.get_feedback_examples(survey_id)
+        grouped = {}
+        for fb in feedbacks:
+            lbl = fb.get("label_name")
+            if not lbl:
+                continue
+            if lbl not in grouped:
+                grouped[lbl] = []
+            grouped[lbl].append({
+                "feedback_text": fb.get("feedback_text"),
+                "sentiment": fb.get("sentiment"),
+                "question_id": fb.get("question_id")
+            })
+        return grouped
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Lỗi khi lấy phản hồi theo nhãn: {str(e)}")
+

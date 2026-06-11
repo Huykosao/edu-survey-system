@@ -151,10 +151,18 @@ export default function SurveyRespondentPage() {
 
     try {
       const rawText = collectOpenEndedText(selectedSurvey.content, answers);
-      await responsesApi.submit(selectedSurvey.id, {
+      const submitPayload: Record<string, any> = {
         answers,
         raw_content_text: rawText,
-      });
+      };
+      // Auto-attach lecturer_id and subject_id from survey target_config (set by admin)
+      if (selectedSurvey.target_config?.lecturer_id) {
+        submitPayload.lecturer_id = selectedSurvey.target_config.lecturer_id;
+      }
+      if (selectedSurvey.target_config?.subject_id) {
+        submitPayload.subject_id = selectedSurvey.target_config.subject_id;
+      }
+      await responsesApi.submit(selectedSurvey.id, submitPayload);
       setShowSuccess(true);
     } catch (err: any) {
       const detail = err?.data?.detail;
