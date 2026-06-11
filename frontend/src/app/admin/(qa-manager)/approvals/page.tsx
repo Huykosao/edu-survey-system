@@ -81,14 +81,25 @@ export default function ApprovalsPage() {
 
       {/* Page Header */}
       <div className="flex flex-col gap-sm border-b border-outline-variant/30 pb-md">
-        <h1 className="font-headline-lg text-headline-lg text-primary font-bold">Phê duyệt Phản hồi Giảng viên</h1>
-        <p className="font-body-md text-body-md text-on-surface-variant">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/20">
+            <span className="material-symbols-outlined text-white text-[22px]">
+              verified_user
+            </span>
+          </div>
+          <div>
+            <h1 className="font-headline-lg text-headline-lg text-primary font-bold tracking-tight">
+              Phê duyệt Phản hồi Giảng viên
+            </h1>
+          </div>
+        </div>
+        <p className="font-body-md text-body-md text-on-surface-variant italic mt-1">
           Kiểm duyệt các lời nhắn, cam kết của giảng viên trước khi xuất bản rộng rãi tới sinh viên của lớp học.
         </p>
       </div>
 
       {/* Main List */}
-      <div className="max-w-4xl space-y-md">
+      <div className="flex flex-col gap-md">
         {loading ? (
           <div className="py-xl text-center flex flex-col items-center gap-md">
             <span className="material-symbols-outlined text-4xl text-primary animate-spin">sync</span>
@@ -117,28 +128,39 @@ export default function ApprovalsPage() {
                 </span>
               </div>
 
-              <div className="bg-surface p-md rounded-lg border border-outline-variant/50 text-sm space-y-2">
-                <p className="text-xs text-on-surface-variant leading-relaxed">
-                  <strong>Lý do giải trình gốc:</strong> {item.originalReason}
+              <div className="bg-surface p-md rounded-2xl border border-outline-variant/50 text-sm space-y-3">
+                <p className="text-xs text-on-surface-variant leading-relaxed bg-surface-container-low p-3 rounded-xl whitespace-pre-wrap">
+                  <strong className="text-on-surface">Lý do giải trình gốc:</strong> <br/>{item.originalReason}
                 </p>
                 <div className="border-t border-outline-variant/20 pt-sm mt-sm">
-                  <p className="font-semibold text-primary mb-1">Nội dung giảng viên viết gửi Sinh viên:</p>
-                  <p className="italic text-on-surface leading-relaxed">&quot;{item.messageContent}&quot;</p>
+                  <div className="font-bold text-primary mb-2 flex items-center gap-2">
+                    <span className="material-symbols-outlined text-[20px] flex-shrink-0">chat</span>
+                    <span>Nội dung giảng viên viết gửi Sinh viên:</span>
+                  </div>
+                  <p className="italic text-on-surface leading-relaxed text-base border-l-4 border-primary/40 pl-3 py-1 bg-primary/5 rounded-r-xl whitespace-pre-wrap">
+                    &quot;{item.messageContent}&quot;
+                  </p>
                 </div>
               </div>
 
-              <div className="flex gap-sm justify-end">
+              <div className="flex gap-sm justify-end mt-2">
                 <button
                   onClick={() => handleReject(item.id)}
-                  className="px-md py-2 border border-outline-variant text-error hover:bg-error-container/10 rounded-lg text-label-md font-label-md transition-colors cursor-pointer"
+                  className="flex items-center gap-1.5 px-5 py-2.5 border border-outline-variant text-error hover:bg-error/10 hover:border-error/30 rounded-xl text-sm font-bold transition-all cursor-pointer"
                 >
+                  <span className="material-symbols-outlined text-[18px]">
+                    block
+                  </span>
                   Từ chối duyệt
                 </button>
                 <button
                   onClick={() => handleApprove(item.id)}
-                  className="px-md py-2 bg-primary text-on-primary hover:bg-primary-container rounded-lg text-label-md font-label-md transition-colors shadow-sm cursor-pointer"
+                  className="flex items-center gap-1.5 px-5 py-2.5 bg-primary text-on-primary hover:bg-primary-container hover:text-on-primary-container rounded-xl text-sm font-bold shadow-md hover:shadow-lg active:scale-95 transition-all cursor-pointer"
                 >
-                  Phê duyệt &amp; Xuất bản gửi SV
+                  <span className="material-symbols-outlined text-[18px]">
+                    publish
+                  </span>
+                  Phê duyệt &amp; Xuất bản
                 </button>
               </div>
             </div>

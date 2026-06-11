@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { surveysApi } from "@/lib/api";
 import {
   BarChart,
@@ -29,7 +30,7 @@ const COLORS = [
 // --- Component: Thẻ chỉ số KPI ---
 const KPICard = ({ title, value, icon, color, subValue }: any) => (
   <div
-    className="bg-surface-container-lowest border border-outline-variant p-lg rounded-[2rem] flex items-center gap-lg shadow-sm border-b-4 animate-in slide-in-from-bottom duration-500"
+    className="bg-surface-container-lowest border border-outline-variant p-lg rounded-2xl flex items-center gap-lg shadow-sm border-b-4 animate-in slide-in-from-bottom duration-500"
     style={{ borderBottomColor: color }}
   >
     <div
@@ -63,8 +64,8 @@ const LikertChart = ({ stats }: { stats: any }) => {
     }),
   );
   return (
-    <div className="h-[250px] w-full">
-      <ResponsiveContainer width="100%" height="100%">
+    <div className="w-full min-h-[250px]">
+      <ResponsiveContainer width="100%" height={250}>
         <BarChart data={chartData}>
           <CartesianGrid
             strokeDasharray="3 3"
@@ -113,8 +114,8 @@ const ChoiceChart = ({ stats }: { stats: any }) => {
     }),
   );
   return (
-    <div className="h-[250px] w-full">
-      <ResponsiveContainer width="100%" height="100%">
+    <div className="w-full min-h-[250px]">
+      <ResponsiveContainer width="100%" height={250}>
         <PieChart>
           <Pie
             data={chartData}
@@ -237,6 +238,8 @@ const OpenEndedList = ({ stats }: { stats: any }) => (
 
 // --- COMPONENT CHÍNH ---
 export default function ReportsPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedReport, setSelectedReport] = useState<any>(null);
@@ -247,16 +250,33 @@ export default function ReportsPage() {
   useEffect(() => {
     surveysApi
       .list({ status: "published" })
-      .then((res: any) => setReports(res.data || []))
+      .then((res: any) => {
+        const data = res.data || [];
+        setReports(data);
+
+        // Khôi phục selectedReport từ URL nếu có
+        const idFromUrl = searchParams.get("sid");
+        if (idFromUrl && !selectedReport) {
+          const found = data.find((r: any) => String(r.id) === idFromUrl);
+          if (found) setSelectedReport(found);
+        }
+      })
       .catch(console.error)
       .finally(() => setLoading(false));
   }, []);
 
-  // Lấy phân tích chi tiết
+  // Lấy phân tích chi tiết + lưu trạng thái vào URL
   useEffect(() => {
     if (selectedReport) {
       setIsAnalysing(true);
       setAnalysis(null);
+
+      // Lưu survey ID vào URL để khôi phục khi F5
+      const currentSid = searchParams.get("sid");
+      if (currentSid !== String(selectedReport.id)) {
+        router.replace(`?sid=${selectedReport.id}`, { scroll: false });
+      }
+
       surveysApi
         .getAnalysis(selectedReport.id)
         .then((res: any) => setAnalysis(res))
@@ -292,6 +312,206 @@ export default function ReportsPage() {
     return { globalCSAT, csatPercentage, npsScore, totalCompleted };
   }, [analysis]);
 
+  const handleExportExcel = async () => {
+    if (!analysis || !selectedReport) return;
+
+    try {
+      // Nhập động exceljs từ phiên bản minified cho trình duyệt để tránh lỗi module Node.js
+      // @ts-ignore
+      const exceljsModule = await import("exceljs/dist/exceljs.min.js");
+      // @ts-ignore
+      const ExcelJS = exceljsModule.default || exceljsModule || window.ExcelJS;
+      if (!ExcelJS || !ExcelJS.Workbook) {
+        throw new Error("Thư viện ExcelJS chưa được tải đúng cách.");
+      }
+      const workbook = new ExcelJS.Workbook();
+      const sheet = workbook.addWorksheet("Báo cáo phân tích", {
+        views: [{ showGridLines: false }], // Ẩn lưới mặc định cho chuyên nghiệp
+      });
+
+      // Định dạng cột
+      sheet.columns = [
+        { header: "", key: "cauSo", width: 15 },
+        { header: "", key: "noiDung", width: 90 }, // Tăng độ rộng cột Nội dung
+        { header: "", key: "val1", width: 18 },
+        { header: "", key: "val2", width: 18 },
+        { header: "", key: "val3", width: 18 },
+        { header: "", key: "val4", width: 18 },
+        { header: "", key: "val5", width: 18 },
+      ];
+
+      // Bật tự động xuống dòng (wrapText) cho toàn bộ cột nội dung
+      sheet.getColumn("noiDung").alignment = { wrapText: true, vertical: "middle" };
+
+      // --- TIÊU ĐỀ BÁO CÁO ---
+      const titleRow = sheet.addRow(["BÁO CÁO PHÂN TÍCH: " + (selectedReport.title || "").toUpperCase()]);
+      sheet.mergeCells(titleRow.number, 1, titleRow.number, 7);
+      titleRow.height = 40;
+      const titleCell = titleRow.getCell(1);
+      titleCell.font = { name: "Arial", size: 16, bold: true, color: { argb: "FFFFFFFF" } };
+      titleCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF00236F" } }; // Primary color
+      titleCell.alignment = { vertical: "middle", horizontal: "center" };
+
+      // --- TỔNG QUAN ---
+      const overviewTitleRow = sheet.addRow(["1. TỔNG QUAN CHIẾN DỊCH"]);
+      sheet.mergeCells(overviewTitleRow.number, 1, overviewTitleRow.number, 7);
+      overviewTitleRow.height = 30;
+      const overviewTitleCell = overviewTitleRow.getCell(1);
+      overviewTitleCell.font = { name: "Arial", size: 12, bold: true, color: { argb: "FF0058BE" } };
+      overviewTitleCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF3F4F6" } };
+      overviewTitleCell.alignment = { vertical: "middle", horizontal: "left" };
+
+      const tr1 = sheet.addRow({ cauSo: "", noiDung: "Tổng số phản hồi", val1: analysis.total_responses ?? 0 });
+      const tr2 = sheet.addRow({ cauSo: "", noiDung: "CSAT (Hài lòng tổng thể)", val1: (overviewStats?.globalCSAT !== undefined && overviewStats?.globalCSAT !== null) ? `${overviewStats.globalCSAT}/5.0` : "Không áp dụng" });
+      const tr3 = sheet.addRow({ cauSo: "", noiDung: "NPS (Chỉ số trung thành)", val1: overviewStats?.npsScore ?? "Không áp dụng" });
+      
+      // Làm đậm cột B và vẽ viền cho phần tổng quan (động)
+      const overviewBorder = {
+        top: { style: "thin", color: { argb: "FFC5C5D3" } },
+        left: { style: "thin", color: { argb: "FFC5C5D3" } },
+        bottom: { style: "thin", color: { argb: "FFC5C5D3" } },
+        right: { style: "thin", color: { argb: "FFC5C5D3" } },
+      };
+      [tr1, tr2, tr3].forEach((row: any) => {
+        row.getCell(2).font = { bold: true };
+        for (let c = 1; c <= 7; c++) {
+          row.getCell(c).border = overviewBorder;
+        }
+      });
+
+      sheet.addRow([]); // Dòng trống
+      
+      // --- CHI TIẾT ---
+      const detailsTitleRow = sheet.addRow(["2. PHÂN TÍCH CHI TIẾT TỪNG CÂU HỎI"]);
+      sheet.mergeCells(detailsTitleRow.number, 1, detailsTitleRow.number, 7);
+      detailsTitleRow.height = 30;
+      const detailsTitleCell = detailsTitleRow.getCell(1);
+      detailsTitleCell.font = { name: "Arial", size: 12, bold: true, color: { argb: "FF0058BE" } };
+      detailsTitleCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF3F4F6" } };
+      detailsTitleCell.alignment = { vertical: "middle", horizontal: "left" };
+
+      // Header của bảng chi tiết
+      const headerRow = sheet.addRow({
+        cauSo: "CÂU SỐ",
+        noiDung: "NỘI DUNG / THỐNG KÊ CHI TIẾT",
+        val1: "GIÁ TRỊ 1",
+        val2: "GIÁ TRỊ 2",
+        val3: "GIÁ TRỊ 3",
+        val4: "GIÁ TRỊ 4",
+        val5: "GIÁ TRỊ 5",
+      });
+      
+      headerRow.eachCell((cell: any) => {
+        cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF757682" } };
+        cell.alignment = { vertical: "middle", horizontal: "center" };
+        cell.border = {
+          top: { style: "thin", color: { argb: "FFC5C5D3" } },
+          left: { style: "thin", color: { argb: "FFC5C5D3" } },
+          bottom: { style: "thin", color: { argb: "FFC5C5D3" } },
+          right: { style: "thin", color: { argb: "FFC5C5D3" } },
+        };
+      });
+
+      const detailsStartRowNumber = headerRow.number; // Lưu lại để vẽ viền khung cho phần dưới
+
+      let idx = 1;
+      for (const [qId, qData] of Object.entries(analysis.analysis || {})) {
+        const q = qData as any;
+      
+        const qRow = sheet.addRow({
+          cauSo: `Câu ${idx++}`,
+          noiDung: q.question_label,
+        });
+        qRow.font = { bold: true };
+        qRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFEDEEF0" } };
+
+        if (q.question_type === "likert") {
+          sheet.addRow({
+            noiDung: "→ Điểm TB & Phân bổ (Mức 1 đến 5)",
+            val1: `TB: ${q.stats?.average ?? "Không áp dụng"}`,
+            val2: `Mức 1: ${q.stats?.score_distribution?.["1"] ?? q.stats?.distribution?.["1"] ?? 0}`,
+            val3: `Mức 2: ${q.stats?.score_distribution?.["2"] ?? q.stats?.distribution?.["2"] ?? 0}`,
+            val4: `Mức 3: ${q.stats?.score_distribution?.["3"] ?? q.stats?.distribution?.["3"] ?? 0}`,
+            val5: "Mức 4/5: " + (Number(q.stats?.score_distribution?.["4"] ?? q.stats?.distribution?.["4"] ?? 0) + Number(q.stats?.score_distribution?.["5"] ?? q.stats?.distribution?.["5"] ?? 0))
+          });
+        } else if (q.question_type === "nps") {
+           sheet.addRow({
+            noiDung: "→ Điểm NPS & Phân bổ",
+            val1: `NPS: ${q.stats?.score ?? "Không áp dụng"}`,
+            val2: `Ủng hộ: ${q.stats?.distribution?.promoters || 0}`,
+            val3: `Thường: ${q.stats?.distribution?.passives || 0}`,
+            val4: `Phản đối: ${q.stats?.distribution?.detractors || 0}`,
+          });
+        } else if (q.question_type === "single_choice" || q.question_type === "multiple_choice") {
+          for (const [opt, value] of Object.entries(q.stats?.distribution || {})) {
+            const count = typeof value === "object" ? (value as any).count : value;
+            sheet.addRow({ noiDung: `   • ${opt}`, val1: `Chọn: ${count}` });
+          }
+        } else if (q.question_type === "matrix") {
+          for (const [rowLabel, rowDist] of Object.entries(q.stats?.rows_data || {})) {
+             const dist = (rowDist || {}) as Record<string, number>;
+             const keys = Object.keys(dist);
+             sheet.addRow({
+               noiDung: `   • ${rowLabel}`,
+               val1: keys[0] ? `${keys[0]}: ${dist[keys[0]]}` : "",
+               val2: keys[1] ? `${keys[1]}: ${dist[keys[1]]}` : "",
+               val3: keys[2] ? `${keys[2]}: ${dist[keys[2]]}` : "",
+               val4: keys[3] ? `${keys[3]}: ${dist[keys[3]]}` : "",
+               val5: keys[4] ? `${keys[4]}: ${dist[keys[4]]}` : "",
+             });
+          }
+        } else if (q.question_type === "open_ended") {
+          sheet.addRow({ noiDung: "→ Phản hồi văn bản (Mẫu mới nhất):", val1: "Văn bản" });
+          (q.stats?.latest_samples || []).forEach((sample: string) => {
+            const row = sheet.addRow({ noiDung: `   - "${sample}"` });
+            row.getCell(2).alignment = { wrapText: true };
+          });
+        }
+        // Dòng trống cách ly
+        sheet.addRow([]); 
+      }
+
+      // Đóng khung tất cả các ô có dữ liệu ở phần chi tiết
+      sheet.eachRow((row: any, rowNumber: number) => {
+        if (rowNumber > detailsStartRowNumber) {
+          if (row.cellCount > 0) {
+            for (let colIdx = 1; colIdx <= 7; colIdx++) {
+              const cell = row.getCell(colIdx);
+              cell.border = {
+                top: { style: "thin", color: { argb: "FFC5C5D3" } },
+                left: { style: "thin", color: { argb: "FFC5C5D3" } },
+                bottom: { style: "thin", color: { argb: "FFC5C5D3" } },
+                right: { style: "thin", color: { argb: "FFC5C5D3" } },
+              };
+            }
+          }
+        }
+      });
+
+      // Xuất file
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+      const url = window.URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `BaoCao_Excel_${selectedReport.id}.xlsx`;
+      
+      document.body.appendChild(anchor); // Rất quan trọng cho Firefox/Safari
+      anchor.click();
+      document.body.removeChild(anchor);
+
+      // Trì hoãn thu hồi URL để trình duyệt kịp tải xuống
+      setTimeout(() => {
+        window.URL.revokeObjectURL(url);
+      }, 1000);
+      
+    } catch (error) {
+      console.error("Lỗi khi xuất file Excel:", error);
+      alert("Đã xảy ra lỗi trong quá trình xử lý file Excel. Vui lòng thử lại sau.");
+    }
+  };
+
   return (
     <div className="flex flex-col gap-lg animate-in fade-in duration-700 pb-12">
       {/* Page Header */}
@@ -309,39 +529,6 @@ export default function ReportsPage() {
           giáo dục.
         </p>
       </div>
-
-      {/* KPI Dashboard Section */}
-      {!isAnalysing && overviewStats && (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-md">
-          <KPICard
-            title="Hài lòng tổng thể (CSAT)"
-            value={`${overviewStats.globalCSAT}/5.0`}
-            subValue={`Đạt ${overviewStats.csatPercentage}% mức độ hài lòng`}
-            icon="sentiment_satisfied"
-            color="#6750A4"
-          />
-          <KPICard
-            title="Chỉ số Trung thành (NPS)"
-            value={
-              overviewStats.npsScore !== null ? overviewStats.npsScore : "N/A"
-            }
-            subValue={
-              overviewStats.npsScore && overviewStats.npsScore > 50
-                ? "Mức độ ủng hộ xuất sắc"
-                : "Cần cải thiện trải nghiệm"
-            }
-            icon="recommend"
-            color="#006A60"
-          />
-          <KPICard
-            title="Quy mô phản hồi"
-            value={overviewStats.totalCompleted}
-            subValue="Sinh viên đã hoàn thành"
-            icon="group"
-            color="#984061"
-          />
-        </div>
-      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-lg items-start">
         {/* Sidebar: Danh sách khảo sát */}
@@ -363,9 +550,9 @@ export default function ReportsPage() {
               <button
                 key={r.id}
                 onClick={() => setSelectedReport(r)}
-                className={`w-full text-left p-md border rounded-[1.5rem] transition-all duration-300 ${
+                className={`w-full text-left p-md border rounded-2xl transition-all duration-300 cursor-pointer ${
                   selectedReport?.id === r.id
-                    ? "border-primary bg-primary/5 shadow-md scale-[1.02] ring-1 ring-primary/20"
+                    ? "border-primary bg-primary/5 shadow-md ring-1 ring-primary/20"
                     : "border-outline-variant hover:bg-surface-container-low"
                 }`}
               >
@@ -381,12 +568,12 @@ export default function ReportsPage() {
           )}
         </div>
 
-        {/* Content Area: Biểu đồ chi tiết */}
+        {/* Content Area: KPI + Biểu đồ chi tiết */}
         <div className="lg:col-span-3">
           {selectedReport ? (
             <div className="space-y-lg">
               {/* Report Title Card */}
-              <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-surface-container-highest/30 p-lg rounded-[2.5rem] border border-outline-variant gap-4">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-surface-container-highest/30 p-lg rounded-2xl border border-outline-variant gap-4">
                 <div>
                   <h2 className="text-2xl font-black text-on-surface tracking-tight">
                     {selectedReport.title}
@@ -403,16 +590,52 @@ export default function ReportsPage() {
                     </span>
                   </div>
                 </div>
-                <button className="px-6 py-3 bg-primary text-on-primary rounded-full text-sm font-bold flex items-center justify-center gap-2 shadow-lg shadow-primary/25 hover:scale-105 active:scale-95 transition-all">
+                <button
+                  onClick={handleExportExcel}
+                  className="px-6 py-3 bg-primary text-on-primary rounded-xl text-sm font-bold flex items-center justify-center gap-2 shadow-md hover:bg-primary-container hover:text-on-primary-container active:scale-95 transition-all cursor-pointer shrink-0"
+                >
                   <span className="material-symbols-outlined text-lg">
-                    picture_as_pdf
+                    table_chart
                   </span>
-                  Xuất Báo cáo
+                  Xuất Excel
                 </button>
               </div>
 
+              {/* KPI Dashboard — inside content area */}
+              {!isAnalysing && overviewStats && (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-md">
+                  <KPICard
+                    title="Hài lòng tổng thể (CSAT)"
+                    value={`${overviewStats.globalCSAT}/5.0`}
+                    subValue={`Đạt ${overviewStats.csatPercentage}% mức độ hài lòng`}
+                    icon="sentiment_satisfied"
+                    color="#6750A4"
+                  />
+                  <KPICard
+                    title="Chỉ số Trung thành (NPS)"
+                    value={
+                      overviewStats.npsScore !== null ? overviewStats.npsScore : "N/A"
+                    }
+                    subValue={
+                      overviewStats.npsScore && overviewStats.npsScore > 50
+                        ? "Mức độ ủng hộ xuất sắc"
+                        : "Cần cải thiện trải nghiệm"
+                    }
+                    icon="recommend"
+                    color="#006A60"
+                  />
+                  <KPICard
+                    title="Quy mô phản hồi"
+                    value={overviewStats.totalCompleted}
+                    subValue="Sinh viên đã hoàn thành"
+                    icon="group"
+                    color="#984061"
+                  />
+                </div>
+              )}
+
               {isAnalysing ? (
-                <div className="flex flex-col items-center py-40 gap-6 bg-surface-container-lowest rounded-[3rem] border border-dashed border-outline-variant/50">
+                <div className="flex flex-col items-center py-32 gap-6 bg-surface-container-lowest rounded-2xl border border-dashed border-outline-variant/50">
                   <div className="w-14 h-14 border-[5px] border-primary/20 border-t-primary rounded-full animate-spin" />
                   <div className="text-center">
                     <p className="text-on-surface font-black">
@@ -426,21 +649,21 @@ export default function ReportsPage() {
               ) : analysis ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-lg">
                   {Object.entries(analysis.analysis || {}).map(
-                    ([qId, data]: any) => (
+                    ([qId, data]: any, idx: number) => (
                       <div
                         key={qId}
-                        className="bg-surface-container-lowest border border-outline-variant/40 p-lg rounded-[2.5rem] shadow-sm hover:shadow-md transition-all duration-300 group"
+                        className="bg-surface-container-lowest border border-outline-variant/40 p-lg rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 group"
                       >
                         {/* Question Label Section */}
-                        <div className="flex items-start gap-4 mb-8">
-                          <span className="flex-shrink-0 w-10 h-10 rounded-2xl bg-secondary-container text-on-secondary-container flex items-center justify-center font-black text-sm group-hover:scale-110 transition-transform">
-                            {qId.replace("q_", "").replace("q", "")}
+                        <div className="flex items-start gap-4 mb-6">
+                          <span className="flex-shrink-0 w-10 h-10 rounded-xl bg-secondary-container text-on-secondary-container flex items-center justify-center font-black text-sm group-hover:scale-110 transition-transform">
+                            {idx + 1}
                           </span>
                           <div>
                             <h5 className="font-bold text-on-surface text-md leading-snug">
                               {data.question_label}
                             </h5>
-                            <div className="flex items-center gap-2 mt-2">
+                            <div className="flex items-center gap-2 mt-2 flex-wrap">
                               <span className="text-[9px] uppercase tracking-[0.15em] font-black text-primary bg-primary/5 px-2 py-0.5 rounded-md">
                                 {data.question_type}
                               </span>
@@ -482,12 +705,10 @@ export default function ReportsPage() {
               ) : null}
             </div>
           ) : (
-            <div className="flex-1 min-h-[500px] h-full border-2 border-dashed border-outline-variant/30 rounded-[2.5rem] flex flex-col items-center justify-center text-outline bg-surface-container-lowest/40 backdrop-blur-sm p-xl">
+            <div className="flex-1 min-h-[500px] h-full border-2 border-dashed border-outline-variant/30 rounded-2xl flex flex-col items-center justify-center text-outline bg-surface-container-lowest/40 backdrop-blur-sm p-xl">
               <div className="relative">
-                {/* Vòng tròn trang trí phía sau biểu tượng */}
                 <div className="absolute inset-0 bg-primary/5 rounded-full scale-[1.8] blur-xl" />
-
-                <div className="relative w-20 h-20 bg-surface-container rounded-3xl flex items-center justify-center mb-6 shadow-sm border border-outline-variant/20">
+                <div className="relative w-20 h-20 bg-surface-container rounded-2xl flex items-center justify-center mb-6 shadow-sm border border-outline-variant/20">
                   <span className="material-symbols-outlined text-5xl text-primary/40">
                     analytics
                   </span>
@@ -503,7 +724,6 @@ export default function ReportsPage() {
                 khám phá các số liệu thống kê chi tiết.
               </p>
 
-              {/* Một vài gợi ý nhỏ phía dưới để làm đẹp UI */}
               <div className="mt-8 flex gap-2">
                 <div className="w-2 h-2 rounded-full bg-primary/20" />
                 <div className="w-2 h-2 rounded-full bg-primary/10" />

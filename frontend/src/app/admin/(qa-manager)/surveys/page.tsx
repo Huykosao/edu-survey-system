@@ -381,7 +381,7 @@ export default function SurveysManagerPage() {
   };
 
   return (
-    <div className="flex flex-col gap-lg animate-in fade-in duration-300">
+    <div className="flex flex-col gap-lg animate-in fade-in duration-300 h-auto md:h-full min-h-0">
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-md border-b border-outline-variant/30 pb-md">
         <div>
@@ -423,17 +423,17 @@ export default function SurveysManagerPage() {
 
       {/* Grid List */}
       {loading ? (
-        <div className="py-xl text-center flex flex-col items-center gap-md">
+        <div className="flex-1 min-h-[300px] flex flex-col justify-center items-center text-primary bg-surface-container-lowest border border-outline-variant rounded-xl shadow-sm gap-md">
           <span className="material-symbols-outlined text-4xl text-primary animate-spin">sync</span>
           <span className="text-body-md text-on-surface-variant">Đang tải danh sách khảo sát...</span>
         </div>
       ) : filteredSurveys.length === 0 ? (
-        <div className="py-xl text-center text-on-surface-variant font-body-md bg-surface-container-lowest rounded-xl border border-outline-variant p-lg shadow-inner">
-          <span className="material-symbols-outlined text-5xl text-outline mb-sm block">assignment_late</span>
+        <div className="flex-1 min-h-[300px] flex flex-col justify-center items-center text-on-surface-variant font-body-md bg-surface-container-lowest border border-outline-variant rounded-xl shadow-sm gap-2">
+          <span className="material-symbols-outlined text-5xl text-outline mb-1 block">assignment_late</span>
           Không tìm thấy chiến dịch khảo sát nào.
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-lg">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 items-stretch content-start gap-lg md:flex-1 md:min-h-0 md:overflow-y-auto overflow-visible pr-2 custom-scrollbar pb-4">
           {filteredSurveys.map((survey) => (
             <div
               key={survey.id}
@@ -464,21 +464,21 @@ export default function SurveysManagerPage() {
                   <>
                     <button
                       onClick={() => handlePublish(survey.id)}
-                      className="text-xs font-bold text-emerald-600 hover:underline flex items-center gap-0.5 cursor-pointer"
+                      className="text-xs font-bold text-emerald-600 hover:bg-emerald-50 px-2 py-1 rounded-lg flex items-center gap-1 cursor-pointer transition-colors"
                     >
                       <span className="material-symbols-outlined text-[16px]">publish</span>
                       Phát hành
                     </button>
                     <button
                       onClick={() => handleStartEdit(survey)}
-                      className="text-xs font-bold text-amber-600 hover:underline flex items-center gap-0.5 cursor-pointer"
+                      className="text-xs font-bold text-amber-600 hover:bg-amber-50 px-2 py-1 rounded-lg flex items-center gap-1 cursor-pointer transition-colors"
                     >
                       <span className="material-symbols-outlined text-[16px]">edit</span>
                       Chỉnh sửa
                     </button>
                     <button
                       onClick={() => handleDelete(survey.id)}
-                      className="text-xs font-bold text-error hover:underline flex items-center gap-0.5 cursor-pointer"
+                      className="text-xs font-bold text-error hover:bg-error-container/20 px-2 py-1 rounded-lg flex items-center gap-1 cursor-pointer transition-colors"
                     >
                       <span className="material-symbols-outlined text-[16px]">delete</span>
                       Xóa
@@ -490,7 +490,7 @@ export default function SurveysManagerPage() {
                     {survey.status === "published" && (
                       <button
                         onClick={() => handleClose(survey.id)}
-                        className="text-xs font-bold text-slate-600 hover:underline flex items-center gap-0.5 cursor-pointer"
+                        className="text-xs font-bold text-slate-600 hover:bg-slate-100 px-2 py-1 rounded-lg flex items-center gap-1 cursor-pointer transition-colors"
                       >
                         <span className="material-symbols-outlined text-[16px]">cancel</span>
                         Đóng lại
@@ -502,7 +502,7 @@ export default function SurveysManagerPage() {
                 
                 <button
                   onClick={() => handleDuplicate(survey.id)}
-                  className="text-xs font-bold text-primary hover:underline flex items-center gap-0.5 cursor-pointer ml-auto"
+                  className="text-xs font-bold text-primary hover:bg-primary/8 px-2 py-1 rounded-lg flex items-center gap-1 cursor-pointer transition-colors ml-auto"
                 >
                   <span className="material-symbols-outlined text-[16px]">content_copy</span>
                   Sao chép

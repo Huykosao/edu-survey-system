@@ -589,14 +589,14 @@ export default function AIAnalysisPage() {
           {/* Action Card */}
           <div className="bg-gradient-to-br from-violet-50 to-indigo-50 border border-violet-200 rounded-2xl p-lg shadow-sm">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-md">
-              <div className="space-y-xs">
+              <div className="space-y-xs flex-1 min-w-0">
                 <h2 className="font-bold text-on-surface text-base flex items-center gap-2">
                   <span className="material-symbols-outlined text-violet-600 text-[22px]">
                     auto_awesome
                   </span>
                   Gán nhãn AI tự động
                 </h2>
-                <p className="text-xs text-on-surface-variant max-w-md leading-relaxed">
+                <p className="text-xs text-on-surface-variant max-w-[450px] leading-relaxed">
                   AI sẽ quét toàn bộ câu trả lời mở trong khảo sát, phân loại
                   theo nhãn đã cài đặt, và gán nhãn cảm xúc{" "}
                   <span className="font-bold text-emerald-600">tích cực</span>,{" "}
@@ -775,14 +775,14 @@ export default function AIAnalysisPage() {
           {/* Action Card */}
           <div className="bg-gradient-to-br from-indigo-50 to-cyan-50 border border-indigo-200 rounded-2xl p-lg shadow-sm">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-md">
-              <div className="space-y-xs">
+              <div className="space-y-xs flex-1 min-w-0">
                 <h2 className="font-bold text-on-surface text-base flex items-center gap-2">
                   <span className="material-symbols-outlined text-indigo-600 text-[22px]">
                     insights
                   </span>
                   Tạo báo cáo phân tích AI
                 </h2>
-                <p className="text-xs text-on-surface-variant max-w-md leading-relaxed">
+                <p className="text-xs text-on-surface-variant max-w-[450px] leading-relaxed">
                   AI sẽ tổng hợp dữ liệu định lượng (điểm số Likert/NPS) và
                   định tính (nhãn đã gán) để lập báo cáo xu hướng và đề xuất
                   giải pháp cải thiện.
@@ -1021,11 +1021,11 @@ export default function AIAnalysisPage() {
                   </span>
                 </div>
               </div>
-              <div className="text-center">
+              <div className="text-center w-full">
                 <p className="font-bold text-on-surface text-base">
                   Chưa có báo cáo AI nào
                 </p>
-                <p className="text-sm text-on-surface-variant mt-2 max-w-sm leading-relaxed">
+                <p className="text-sm text-on-surface-variant mt-2 w-full max-w-[380px] mx-auto leading-relaxed">
                   Nhấn <span className="font-bold">Tạo báo cáo AI</span> ở trên
                   để AI phân tích và lập báo cáo xu hướng cho khảo sát này.
                 </p>

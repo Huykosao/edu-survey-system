@@ -3,7 +3,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { usersApi, facultiesApi } from "@/lib/api";
-import * as XLSX from "xlsx";
 
 interface User {
   id: string;
@@ -189,53 +188,100 @@ export default function UserManagementPage() {
     }
   };
 
-  const handleDownloadTemplate = () => {
-    const ws = XLSX.utils.json_to_sheet([
-      {
-        "Mật khẩu": "matkhau123",
-        "Họ và tên": "Nguyễn Văn A",
-        "Email": "nva@example.com",
-        "Số điện thoại": "0987654321",
-        "Khoa": "Công nghệ thông tin"
-      },
-      {
-        "Mật khẩu": "matkhau456",
-        "Họ và tên": "Trần Thị B",
-        "Email": "ttb@example.com",
-        "Số điện thoại": "0912345678",
-        "Khoa": "Kinh tế"
+  const handleDownloadTemplate = async () => {
+    try {
+      // @ts-ignore
+      const exceljsModule = await import("exceljs/dist/exceljs.min.js");
+      // @ts-ignore
+      const ExcelJS = exceljsModule.default || exceljsModule || window.ExcelJS;
+      if (!ExcelJS || !ExcelJS.Workbook) {
+        throw new Error("Thư viện ExcelJS chưa được tải đúng cách.");
       }
-    ]);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Users Template");
-    XLSX.writeFile(wb, "Mau_nhap_nguoi_dung.xlsx");
+      const workbook = new ExcelJS.Workbook();
+      const sheet = workbook.addWorksheet("Users Template");
+      
+      sheet.columns = [
+        { header: "Mật khẩu", key: "password", width: 15 },
+        { header: "Họ và tên", key: "name", width: 25 },
+        { header: "Email", key: "email", width: 30 },
+        { header: "Số điện thoại", key: "phone", width: 15 },
+        { header: "Khoa", key: "faculty", width: 25 }
+      ];
+      
+      sheet.addRow({ password: "matkhau123", name: "Nguyễn Văn A", email: "nva@example.com", phone: "0987654321", faculty: "Công nghệ thông tin" });
+      sheet.addRow({ password: "matkhau456", name: "Trần Thị B", email: "ttb@example.com", phone: "0912345678", faculty: "Kinh tế" });
+      
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+      const url = window.URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = "Mau_nhap_nguoi_dung.xlsx";
+      document.body.appendChild(anchor);
+      anchor.click();
+      document.body.removeChild(anchor);
+      setTimeout(() => window.URL.revokeObjectURL(url), 1000);
+    } catch (error) {
+      console.error("Lỗi khi tải template Excel:", error);
+      alert("Đã xảy ra lỗi khi tạo file Excel mẫu. Vui lòng thử lại sau.");
+    }
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = async (evt) => {
-      try {
-        const ab = evt.target?.result;
-        if (!(ab instanceof ArrayBuffer)) {
-          alert("Lỗi đọc file: Không thể đọc dữ liệu nhị phân.");
-          return;
-        }
-        const wb = XLSX.read(ab, { type: "array" });
-        if (!wb.SheetNames || wb.SheetNames.length === 0) {
-          alert("File Excel không hợp lệ hoặc không có trang tính.");
-          return;
-        }
-        const wsname = wb.SheetNames[0];
-        const ws = wb.Sheets[wsname];
-        const rawData: any[] = XLSX.utils.sheet_to_json(ws);
+    try {
+      // @ts-ignore
+      const exceljsModule = await import("exceljs/dist/exceljs.min.js");
+      // @ts-ignore
+      const ExcelJS = exceljsModule.default || exceljsModule || window.ExcelJS;
+      if (!ExcelJS || !ExcelJS.Workbook) {
+        throw new Error("Thư viện ExcelJS chưa được tải đúng cách.");
+      }
+      const workbook = new ExcelJS.Workbook();
+      const arrayBuffer = await file.arrayBuffer();
+      await workbook.xlsx.load(arrayBuffer);
 
-        // Lọc các hàng trống hoàn toàn
-        const data = rawData.filter(row => Object.keys(row).some(key => row[key] !== undefined && row[key] !== null && row[key].toString().trim() !== ""));
+      const ws = workbook.worksheets[0];
+      if (!ws) {
+        alert("File Excel không hợp lệ hoặc không có trang tính.");
+        if (e.target) e.target.value = "";
+        return;
+      }
 
-        if (data.length === 0) {
+      const rawData: any[] = [];
+      const headers: string[] = [];
+
+      ws.eachRow((row: any, rowNumber: number) => {
+        if (rowNumber === 1) {
+          row.eachCell((cell: any, colNumber: number) => {
+            headers[colNumber] = cell.value ? cell.value.toString().trim() : "";
+          });
+        } else {
+          const rowData: any = {};
+          let hasData = false;
+          row.eachCell((cell: any, colNumber: number) => {
+            const header = headers[colNumber];
+            if (header && cell.value !== undefined && cell.value !== null) {
+              let val = cell.value;
+              if (typeof val === "object") {
+                if (val.result !== undefined) val = val.result;
+                else if (val.text !== undefined) val = val.text;
+                else if (val.richText) val = val.richText.map((t: any) => t.text).join("");
+                else if (val instanceof Date) val = val.toISOString();
+                else val = val.toString();
+              }
+              rowData[header] = val;
+              hasData = true;
+            }
+          });
+          if (hasData) rawData.push(rowData);
+        }
+      });
+
+      const data = rawData;
+      if (data.length === 0) {
           alert("File Excel trống hoặc không có dữ liệu hợp lệ!");
           return;
         }
@@ -318,15 +364,12 @@ export default function UserManagementPage() {
         }
 
         loadUsers();
-      } catch (error: any) {
-        console.error("Error parsing Excel file:", error);
-        setImportErrors([error?.message || "Có lỗi xảy ra trong quá trình xử lý file."]);
-        setImportStatus("error");
+      } catch (error) {
+        console.error("Lỗi khi nhập dữ liệu từ Excel:", error);
+        alert("Đã xảy ra lỗi khi đọc file Excel. Vui lòng đảm bảo file đúng định dạng mẫu.");
       } finally {
         if (e.target) e.target.value = ""; // Reset input
       }
-    };
-    reader.readAsArrayBuffer(file);
   };
 
   const totalPages = Math.max(1, Math.ceil(totalUsers / ITEMS_PER_PAGE));
@@ -952,7 +995,7 @@ export default function UserManagementPage() {
 
                   <button
                     onClick={handleDownloadTemplate}
-                    className="mt-2 text-primary font-label-md flex items-center gap-2 hover:underline self-start bg-transparent border-none cursor-pointer"
+                    className="mt-2 text-primary font-label-md flex items-center gap-2 hover:bg-primary/8 px-2 py-1 rounded-lg self-start bg-transparent border-none cursor-pointer transition-colors"
                   >
                     <span className="material-symbols-outlined text-[20px]">download</span>
                     Tải file Excel mẫu

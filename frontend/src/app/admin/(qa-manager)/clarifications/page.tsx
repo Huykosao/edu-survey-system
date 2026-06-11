@@ -40,7 +40,7 @@ export default function ClarificationCenterPage() {
       const surveyRes: any = await surveysApi.list();
       setSurveys(surveyRes.data || []);
 
-      const userRes: any = await usersApi.list({ role: "Giảng viên" });
+      const userRes: any = await usersApi.list({ role: "LECTURER", limit: 100 });
       setLecturers(userRes.data || []);
 
       const tasksRes: any = await clarificationsApi.listAll();
@@ -203,7 +203,7 @@ export default function ClarificationCenterPage() {
                 </p>
               </div>
               <button
-                className="text-primary hover:underline text-sm font-semibold flex items-center gap-1 shrink-0 self-start sm:self-auto cursor-pointer"
+                className="text-primary hover:bg-primary/8 text-sm font-semibold flex items-center gap-1 shrink-0 self-start sm:self-auto cursor-pointer px-2.5 py-1 rounded-lg transition-colors"
               >
                 Chi tiết
                 <span className="material-symbols-outlined text-[16px]">chevron_right</span>
