@@ -350,10 +350,9 @@ export default function UserManagementPage() {
         }
 
         loadUsers();
-      } catch (error: any) {
-        console.error("Error parsing Excel file:", error);
-        setImportErrors([error?.message || "Có lỗi xảy ra trong quá trình xử lý file."]);
-        setImportStatus("error");
+      } catch (error) {
+        console.error("Lỗi khi nhập dữ liệu từ Excel:", error);
+        alert("Đã xảy ra lỗi khi đọc file Excel. Vui lòng đảm bảo file đúng định dạng mẫu.");
       } finally {
         if (e.target) e.target.value = ""; // Reset input
       }

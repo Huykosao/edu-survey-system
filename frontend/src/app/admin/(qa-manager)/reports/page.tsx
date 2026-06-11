@@ -318,172 +318,172 @@ export default function ReportsPage() {
     try {
       // Nhập động exceljs từ phiên bản minified cho trình duyệt để tránh lỗi module Node.js
       // @ts-ignore
-      const ExcelJS = (await import("exceljs/dist/exceljs.min.js")).default || await import("exceljs/dist/exceljs.min.js");
-
+      const exceljsModule = await import("exceljs/dist/exceljs.min.js");
+      const ExcelJS = exceljsModule.default || exceljsModule;
       const workbook = new ExcelJS.Workbook();
-    const sheet = workbook.addWorksheet("Báo cáo phân tích", {
-      views: [{ showGridLines: false }], // Ẩn lưới mặc định cho chuyên nghiệp
-    });
+      const sheet = workbook.addWorksheet("Báo cáo phân tích", {
+        views: [{ showGridLines: false }], // Ẩn lưới mặc định cho chuyên nghiệp
+      });
 
-    // Định dạng cột
-    sheet.columns = [
-      { header: "", key: "cauSo", width: 15 },
-      { header: "", key: "noiDung", width: 90 }, // Tăng độ rộng cột Nội dung
-      { header: "", key: "val1", width: 18 },
-      { header: "", key: "val2", width: 18 },
-      { header: "", key: "val3", width: 18 },
-      { header: "", key: "val4", width: 18 },
-      { header: "", key: "val5", width: 18 },
-    ];
+      // Định dạng cột
+      sheet.columns = [
+        { header: "", key: "cauSo", width: 15 },
+        { header: "", key: "noiDung", width: 90 }, // Tăng độ rộng cột Nội dung
+        { header: "", key: "val1", width: 18 },
+        { header: "", key: "val2", width: 18 },
+        { header: "", key: "val3", width: 18 },
+        { header: "", key: "val4", width: 18 },
+        { header: "", key: "val5", width: 18 },
+      ];
 
-    // Bật tự động xuống dòng (wrapText) cho toàn bộ cột nội dung
-    sheet.getColumn("noiDung").alignment = { wrapText: true, vertical: "middle" };
+      // Bật tự động xuống dòng (wrapText) cho toàn bộ cột nội dung
+      sheet.getColumn("noiDung").alignment = { wrapText: true, vertical: "middle" };
 
-    // --- TIÊU ĐỀ BÁO CÁO ---
-    const titleRow = sheet.addRow(["BÁO CÁO PHÂN TÍCH: " + (selectedReport.title || "").toUpperCase()]);
-    sheet.mergeCells(titleRow.number, 1, titleRow.number, 7);
-    titleRow.height = 40;
-    const titleCell = titleRow.getCell(1);
-    titleCell.font = { name: "Arial", size: 16, bold: true, color: { argb: "FFFFFFFF" } };
-    titleCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF00236F" } }; // Primary color
-    titleCell.alignment = { vertical: "middle", horizontal: "center" };
+      // --- TIÊU ĐỀ BÁO CÁO ---
+      const titleRow = sheet.addRow(["BÁO CÁO PHÂN TÍCH: " + (selectedReport.title || "").toUpperCase()]);
+      sheet.mergeCells(titleRow.number, 1, titleRow.number, 7);
+      titleRow.height = 40;
+      const titleCell = titleRow.getCell(1);
+      titleCell.font = { name: "Arial", size: 16, bold: true, color: { argb: "FFFFFFFF" } };
+      titleCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF00236F" } }; // Primary color
+      titleCell.alignment = { vertical: "middle", horizontal: "center" };
 
-    // --- TỔNG QUAN ---
-    const overviewTitleRow = sheet.addRow(["1. TỔNG QUAN CHIẾN DỊCH"]);
-    sheet.mergeCells(overviewTitleRow.number, 1, overviewTitleRow.number, 7);
-    overviewTitleRow.height = 30;
-    const overviewTitleCell = overviewTitleRow.getCell(1);
-    overviewTitleCell.font = { name: "Arial", size: 12, bold: true, color: { argb: "FF0058BE" } };
-    overviewTitleCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF3F4F6" } };
-    overviewTitleCell.alignment = { vertical: "middle", horizontal: "left" };
+      // --- TỔNG QUAN ---
+      const overviewTitleRow = sheet.addRow(["1. TỔNG QUAN CHIẾN DỊCH"]);
+      sheet.mergeCells(overviewTitleRow.number, 1, overviewTitleRow.number, 7);
+      overviewTitleRow.height = 30;
+      const overviewTitleCell = overviewTitleRow.getCell(1);
+      overviewTitleCell.font = { name: "Arial", size: 12, bold: true, color: { argb: "FF0058BE" } };
+      overviewTitleCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF3F4F6" } };
+      overviewTitleCell.alignment = { vertical: "middle", horizontal: "left" };
 
-    const tr1 = sheet.addRow({ cauSo: "", noiDung: "Tổng số phản hồi", val1: analysis.total_responses ?? 0 });
-    const tr2 = sheet.addRow({ cauSo: "", noiDung: "CSAT (Hài lòng tổng thể)", val1: (overviewStats?.globalCSAT !== undefined && overviewStats?.globalCSAT !== null) ? `${overviewStats.globalCSAT}/5.0` : "Không áp dụng" });
-    const tr3 = sheet.addRow({ cauSo: "", noiDung: "NPS (Chỉ số trung thành)", val1: overviewStats?.npsScore ?? "Không áp dụng" });
-    
-    // Làm đậm cột B và vẽ viền cho phần tổng quan (động)
-    const overviewBorder = {
-      top: { style: "thin", color: { argb: "FFC5C5D3" } },
-      left: { style: "thin", color: { argb: "FFC5C5D3" } },
-      bottom: { style: "thin", color: { argb: "FFC5C5D3" } },
-      right: { style: "thin", color: { argb: "FFC5C5D3" } },
-    };
-    [tr1, tr2, tr3].forEach((row: any) => {
-      row.getCell(2).font = { bold: true };
-      for (let c = 1; c <= 7; c++) {
-        row.getCell(c).border = overviewBorder;
-      }
-    });
-
-    sheet.addRow([]); // Dòng trống
-    
-    // --- CHI TIẾT ---
-    const detailsTitleRow = sheet.addRow(["2. PHÂN TÍCH CHI TIẾT TỪNG CÂU HỎI"]);
-    sheet.mergeCells(detailsTitleRow.number, 1, detailsTitleRow.number, 7);
-    detailsTitleRow.height = 30;
-    const detailsTitleCell = detailsTitleRow.getCell(1);
-    detailsTitleCell.font = { name: "Arial", size: 12, bold: true, color: { argb: "FF0058BE" } };
-    detailsTitleCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF3F4F6" } };
-    detailsTitleCell.alignment = { vertical: "middle", horizontal: "left" };
-
-    // Header của bảng chi tiết
-    const headerRow = sheet.addRow({
-      cauSo: "CÂU SỐ",
-      noiDung: "NỘI DUNG / THỐNG KÊ CHI TIẾT",
-      val1: "GIÁ TRỊ 1",
-      val2: "GIÁ TRỊ 2",
-      val3: "GIÁ TRỊ 3",
-      val4: "GIÁ TRỊ 4",
-      val5: "GIÁ TRỊ 5",
-    });
-    
-    headerRow.eachCell((cell: any) => {
-      cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
-      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF757682" } };
-      cell.alignment = { vertical: "middle", horizontal: "center" };
-      cell.border = {
+      const tr1 = sheet.addRow({ cauSo: "", noiDung: "Tổng số phản hồi", val1: analysis.total_responses ?? 0 });
+      const tr2 = sheet.addRow({ cauSo: "", noiDung: "CSAT (Hài lòng tổng thể)", val1: (overviewStats?.globalCSAT !== undefined && overviewStats?.globalCSAT !== null) ? `${overviewStats.globalCSAT}/5.0` : "Không áp dụng" });
+      const tr3 = sheet.addRow({ cauSo: "", noiDung: "NPS (Chỉ số trung thành)", val1: overviewStats?.npsScore ?? "Không áp dụng" });
+      
+      // Làm đậm cột B và vẽ viền cho phần tổng quan (động)
+      const overviewBorder = {
         top: { style: "thin", color: { argb: "FFC5C5D3" } },
         left: { style: "thin", color: { argb: "FFC5C5D3" } },
         bottom: { style: "thin", color: { argb: "FFC5C5D3" } },
         right: { style: "thin", color: { argb: "FFC5C5D3" } },
       };
-    });
-
-    const detailsStartRowNumber = headerRow.number; // Lưu lại để vẽ viền khung cho phần dưới
-
-    let idx = 1;
-    for (const [qId, qData] of Object.entries(analysis.analysis || {})) {
-      const q = qData as any;
-      
-      const qRow = sheet.addRow({
-        cauSo: `Câu ${idx++}`,
-        noiDung: q.question_label,
+      [tr1, tr2, tr3].forEach((row: any) => {
+        row.getCell(2).font = { bold: true };
+        for (let c = 1; c <= 7; c++) {
+          row.getCell(c).border = overviewBorder;
+        }
       });
-      qRow.font = { bold: true };
-      qRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFEDEEF0" } };
 
-      if (q.question_type === "likert") {
-        sheet.addRow({
-          noiDung: "→ Điểm TB & Phân bổ (Mức 1 đến 5)",
-          val1: `TB: ${q.stats?.average ?? "Không áp dụng"}`,
-          val2: `Mức 1: ${q.stats?.score_distribution?.["1"] ?? q.stats?.distribution?.["1"] ?? 0}`,
-          val3: `Mức 2: ${q.stats?.score_distribution?.["2"] ?? q.stats?.distribution?.["2"] ?? 0}`,
-          val4: `Mức 3: ${q.stats?.score_distribution?.["3"] ?? q.stats?.distribution?.["3"] ?? 0}`,
-          val5: "Mức 4/5: " + (Number(q.stats?.score_distribution?.["4"] ?? q.stats?.distribution?.["4"] ?? 0) + Number(q.stats?.score_distribution?.["5"] ?? q.stats?.distribution?.["5"] ?? 0))
+      sheet.addRow([]); // Dòng trống
+      
+      // --- CHI TIẾT ---
+      const detailsTitleRow = sheet.addRow(["2. PHÂN TÍCH CHI TIẾT TỪNG CÂU HỎI"]);
+      sheet.mergeCells(detailsTitleRow.number, 1, detailsTitleRow.number, 7);
+      detailsTitleRow.height = 30;
+      const detailsTitleCell = detailsTitleRow.getCell(1);
+      detailsTitleCell.font = { name: "Arial", size: 12, bold: true, color: { argb: "FF0058BE" } };
+      detailsTitleCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF3F4F6" } };
+      detailsTitleCell.alignment = { vertical: "middle", horizontal: "left" };
+
+      // Header của bảng chi tiết
+      const headerRow = sheet.addRow({
+        cauSo: "CÂU SỐ",
+        noiDung: "NỘI DUNG / THỐNG KÊ CHI TIẾT",
+        val1: "GIÁ TRỊ 1",
+        val2: "GIÁ TRỊ 2",
+        val3: "GIÁ TRỊ 3",
+        val4: "GIÁ TRỊ 4",
+        val5: "GIÁ TRỊ 5",
+      });
+      
+      headerRow.eachCell((cell: any) => {
+        cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF757682" } };
+        cell.alignment = { vertical: "middle", horizontal: "center" };
+        cell.border = {
+          top: { style: "thin", color: { argb: "FFC5C5D3" } },
+          left: { style: "thin", color: { argb: "FFC5C5D3" } },
+          bottom: { style: "thin", color: { argb: "FFC5C5D3" } },
+          right: { style: "thin", color: { argb: "FFC5C5D3" } },
+        };
+      });
+
+      const detailsStartRowNumber = headerRow.number; // Lưu lại để vẽ viền khung cho phần dưới
+
+      let idx = 1;
+      for (const [qId, qData] of Object.entries(analysis.analysis || {})) {
+        const q = qData as any;
+      
+        const qRow = sheet.addRow({
+          cauSo: `Câu ${idx++}`,
+          noiDung: q.question_label,
         });
-      } else if (q.question_type === "nps") {
-         sheet.addRow({
-          noiDung: "→ Điểm NPS & Phân bổ",
-          val1: `NPS: ${q.stats?.score ?? "Không áp dụng"}`,
-          val2: `Ủng hộ: ${q.stats?.distribution?.promoters || 0}`,
-          val3: `Thường: ${q.stats?.distribution?.passives || 0}`,
-          val4: `Phản đối: ${q.stats?.distribution?.detractors || 0}`,
-        });
-      } else if (q.question_type === "single_choice" || q.question_type === "multiple_choice") {
-        for (const [opt, value] of Object.entries(q.stats?.distribution || {})) {
-          const count = typeof value === "object" ? (value as any).count : value;
-          sheet.addRow({ noiDung: `   • ${opt}`, val1: `Chọn: ${count}` });
-        }
-      } else if (q.question_type === "matrix") {
-        for (const [rowLabel, rowDist] of Object.entries(q.stats?.rows_data || {})) {
-           const dist = (rowDist || {}) as Record<string, number>;
-           const keys = Object.keys(dist);
+        qRow.font = { bold: true };
+        qRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFEDEEF0" } };
+
+        if (q.question_type === "likert") {
+          sheet.addRow({
+            noiDung: "→ Điểm TB & Phân bổ (Mức 1 đến 5)",
+            val1: `TB: ${q.stats?.average ?? "Không áp dụng"}`,
+            val2: `Mức 1: ${q.stats?.score_distribution?.["1"] ?? q.stats?.distribution?.["1"] ?? 0}`,
+            val3: `Mức 2: ${q.stats?.score_distribution?.["2"] ?? q.stats?.distribution?.["2"] ?? 0}`,
+            val4: `Mức 3: ${q.stats?.score_distribution?.["3"] ?? q.stats?.distribution?.["3"] ?? 0}`,
+            val5: "Mức 4/5: " + (Number(q.stats?.score_distribution?.["4"] ?? q.stats?.distribution?.["4"] ?? 0) + Number(q.stats?.score_distribution?.["5"] ?? q.stats?.distribution?.["5"] ?? 0))
+          });
+        } else if (q.question_type === "nps") {
            sheet.addRow({
-             noiDung: `   • ${rowLabel}`,
-             val1: keys[0] ? `${keys[0]}: ${dist[keys[0]]}` : "",
-             val2: keys[1] ? `${keys[1]}: ${dist[keys[1]]}` : "",
-             val3: keys[2] ? `${keys[2]}: ${dist[keys[2]]}` : "",
-             val4: keys[3] ? `${keys[3]}: ${dist[keys[3]]}` : "",
-             val5: keys[4] ? `${keys[4]}: ${dist[keys[4]]}` : "",
-           });
+            noiDung: "→ Điểm NPS & Phân bổ",
+            val1: `NPS: ${q.stats?.score ?? "Không áp dụng"}`,
+            val2: `Ủng hộ: ${q.stats?.distribution?.promoters || 0}`,
+            val3: `Thường: ${q.stats?.distribution?.passives || 0}`,
+            val4: `Phản đối: ${q.stats?.distribution?.detractors || 0}`,
+          });
+        } else if (q.question_type === "single_choice" || q.question_type === "multiple_choice") {
+          for (const [opt, value] of Object.entries(q.stats?.distribution || {})) {
+            const count = typeof value === "object" ? (value as any).count : value;
+            sheet.addRow({ noiDung: `   • ${opt}`, val1: `Chọn: ${count}` });
+          }
+        } else if (q.question_type === "matrix") {
+          for (const [rowLabel, rowDist] of Object.entries(q.stats?.rows_data || {})) {
+             const dist = (rowDist || {}) as Record<string, number>;
+             const keys = Object.keys(dist);
+             sheet.addRow({
+               noiDung: `   • ${rowLabel}`,
+               val1: keys[0] ? `${keys[0]}: ${dist[keys[0]]}` : "",
+               val2: keys[1] ? `${keys[1]}: ${dist[keys[1]]}` : "",
+               val3: keys[2] ? `${keys[2]}: ${dist[keys[2]]}` : "",
+               val4: keys[3] ? `${keys[3]}: ${dist[keys[3]]}` : "",
+               val5: keys[4] ? `${keys[4]}: ${dist[keys[4]]}` : "",
+             });
+          }
+        } else if (q.question_type === "open_ended") {
+          sheet.addRow({ noiDung: "→ Phản hồi văn bản (Mẫu mới nhất):", val1: "Văn bản" });
+          (q.stats?.latest_samples || []).forEach((sample: string) => {
+            const row = sheet.addRow({ noiDung: `   - "${sample}"` });
+            row.getCell(2).alignment = { wrapText: true };
+          });
         }
-      } else if (q.question_type === "open_ended") {
-        sheet.addRow({ noiDung: "→ Phản hồi văn bản (Mẫu mới nhất):", val1: "Văn bản" });
-        (q.stats?.latest_samples || []).forEach((sample: string) => {
-          const row = sheet.addRow({ noiDung: `   - "${sample}"` });
-          row.getCell(2).alignment = { wrapText: true };
-        });
+        // Dòng trống cách ly
+        sheet.addRow([]); 
       }
-      // Dòng trống cách ly
-      sheet.addRow([]); 
-    }
 
-    // Đóng khung tất cả các ô có dữ liệu ở phần chi tiết
-    sheet.eachRow((row: any, rowNumber: number) => {
-      if (rowNumber > detailsStartRowNumber) {
-        if (row.cellCount > 0) {
-          for (let colIdx = 1; colIdx <= 7; colIdx++) {
-            const cell = row.getCell(colIdx);
-            cell.border = {
-              top: { style: "thin", color: { argb: "FFC5C5D3" } },
-              left: { style: "thin", color: { argb: "FFC5C5D3" } },
-              bottom: { style: "thin", color: { argb: "FFC5C5D3" } },
-              right: { style: "thin", color: { argb: "FFC5C5D3" } },
-            };
+      // Đóng khung tất cả các ô có dữ liệu ở phần chi tiết
+      sheet.eachRow((row: any, rowNumber: number) => {
+        if (rowNumber > detailsStartRowNumber) {
+          if (row.cellCount > 0) {
+            for (let colIdx = 1; colIdx <= 7; colIdx++) {
+              const cell = row.getCell(colIdx);
+              cell.border = {
+                top: { style: "thin", color: { argb: "FFC5C5D3" } },
+                left: { style: "thin", color: { argb: "FFC5C5D3" } },
+                bottom: { style: "thin", color: { argb: "FFC5C5D3" } },
+                right: { style: "thin", color: { argb: "FFC5C5D3" } },
+              };
+            }
           }
         }
-      }
-    });
+      });
 
       // Xuất file
       const buffer = await workbook.xlsx.writeBuffer();
