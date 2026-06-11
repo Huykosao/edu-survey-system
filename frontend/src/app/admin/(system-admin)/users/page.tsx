@@ -224,7 +224,8 @@ export default function UserManagementPage() {
 
     try {
       // @ts-ignore
-      const ExcelJS = (await import("exceljs/dist/exceljs.min.js")).default || await import("exceljs/dist/exceljs.min.js");
+      const exceljsModule = await import("exceljs/dist/exceljs.min.js");
+      const ExcelJS = exceljsModule.default || exceljsModule;
       const workbook = new ExcelJS.Workbook();
       const arrayBuffer = await file.arrayBuffer();
       await workbook.xlsx.load(arrayBuffer);
