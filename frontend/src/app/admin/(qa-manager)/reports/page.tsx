@@ -388,31 +388,47 @@ export default function ReportsPage() {
 
   const isClosed = selectedReport?.status === "closed" || selectedReport?._statusGroup === "closed";
 
-  const handleRunAI = async () => {
+  const [isRunningClassify, setIsRunningClassify] = useState(false);
+  const [isRunningTrend, setIsRunningTrend] = useState(false);
+
+  const handleRunClassify = async () => {
     if (!selectedReport || !isClosed) return;
-    setIsRunningAI(true);
-    setAiRunStatus("Đang chạy phân tích AI...");
+    setIsRunningClassify(true);
+    setAiRunStatus("Đang chạy phân loại nhãn cảm xúc...");
     try {
-      await Promise.all([
-        aiApi.classify(selectedReport.id),
-        aiApi.generateReport(selectedReport.id),
-      ]);
-      setAiRunStatus("AI đã phân tích xong! Đang tải kết quả...");
-      // Reload AI data
-      const [ov, rpt, fbLabel] = await Promise.all([
+      await aiApi.classify(selectedReport.id);
+      setAiRunStatus("Gán nhãn hoàn tất! Đang tải kết quả...");
+      const [ov, fbLabel] = await Promise.all([
         aiApi.getOverview(selectedReport.id).catch(() => null),
-        aiApi.getReport(selectedReport.id).catch(() => null),
         aiApi.getFeedbackByLabel(selectedReport.id).catch(() => ({})),
       ]);
       setAiOverview(ov);
-      setAiReport(rpt);
       setAiFeedbackByLabel(fbLabel);
-      setAiRunStatus("Phân tích AI hoàn tất ✓");
-    } catch (err) {
+      setAiRunStatus("Gán nhãn & Phân tích cảm xúc hoàn tất ✓");
+    } catch (err: any) {
       console.error(err);
-      setAiRunStatus("Lỗi khi chạy AI. Vui lòng thử lại.");
+      setAiRunStatus(`Lỗi khi phân loại nhãn: ${err.message || err}`);
     } finally {
-      setIsRunningAI(false);
+      setIsRunningClassify(false);
+      setTimeout(() => setAiRunStatus(null), 5000);
+    }
+  };
+
+  const handleRunTrendAnalysis = async () => {
+    if (!selectedReport || !isClosed) return;
+    setIsRunningTrend(true);
+    setAiRunStatus("Đang lập báo cáo tóm tắt xu hướng và đề xuất...");
+    try {
+      await aiApi.generateReport(selectedReport.id);
+      setAiRunStatus("Lập báo cáo hoàn tất! Đang tải...");
+      const rpt = await aiApi.getReport(selectedReport.id).catch(() => null);
+      setAiReport(rpt);
+      setAiRunStatus("Báo cáo phân tích xu hướng hoàn tất ✓");
+    } catch (err: any) {
+      console.error(err);
+      setAiRunStatus(`Lỗi khi lập báo cáo: ${err.message || err}`);
+    } finally {
+      setIsRunningTrend(false);
       setTimeout(() => setAiRunStatus(null), 5000);
     }
   };
@@ -748,9 +764,10 @@ export default function ReportsPage() {
           {selectedReport ? (
             <div className="space-y-lg">
               {/* Report Title Card */}
-              <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-surface-container-highest/30 p-lg rounded-2xl border border-outline-variant gap-4">
-                <div>
-                  <div className="flex items-center gap-2 mb-1">
+              <div className="flex flex-col bg-surface-container-highest/30 p-lg rounded-2xl border border-outline-variant gap-lg shadow-sm">
+                {/* Row 1: Status and Title */}
+                <div className="space-y-xs">
+                  <div className="flex items-center gap-2">
                     <span className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full border ${
                       isClosed
                         ? "bg-slate-100 text-slate-700 border-slate-200"
@@ -762,35 +779,42 @@ export default function ReportsPage() {
                   <h2 className="text-2xl font-black text-on-surface tracking-tight">
                     {selectedReport.title}
                   </h2>
-                  <div className="flex items-center gap-4 mt-2 flex-wrap">
-                    <span className="bg-primary/10 text-primary px-4 py-1 rounded-full text-xs font-bold flex items-center gap-1">
-                      <span className="material-symbols-outlined text-xs">analytics</span>
-                      {analysis?.total_responses || generalStats?.total_responses || 0} Phản hồi
-                    </span>
-                    {generalStats?.total_open_feedbacks > 0 && (
-                      <span className="bg-secondary/10 text-secondary px-4 py-1 rounded-full text-xs font-bold flex items-center gap-1">
-                        <span className="material-symbols-outlined text-xs">chat</span>
-                        {generalStats.total_open_feedbacks} Câu hỏi mở
-                      </span>
-                    )}
-                    {selectedReport.target_config?.faculty_id && (
-                      <span className="bg-tertiary/10 text-tertiary px-3 py-1 rounded-full text-xs font-bold">
-                        🏫 Khoa #{selectedReport.target_config.faculty_id}
-                      </span>
-                    )}
-                    {selectedReport.target_config?.subject_id && (
-                      <span className="bg-tertiary/10 text-tertiary px-3 py-1 rounded-full text-xs font-bold">
-                        📚 Môn #{selectedReport.target_config.subject_id}
-                      </span>
-                    )}
-                    {selectedReport.target_config?.lecturer_id && (
-                      <span className="bg-tertiary/10 text-tertiary px-3 py-1 rounded-full text-xs font-bold">
-                        👤 GV #{selectedReport.target_config.lecturer_id}
-                      </span>
-                    )}
-                  </div>
                 </div>
-                <div className="flex flex-wrap gap-2 shrink-0">
+
+                {/* Row 2: Metadata Information */}
+                <div className="flex flex-wrap items-center gap-sm border-t border-b border-outline-variant/20 py-sm">
+                  <span className="bg-primary/10 text-primary px-4 py-1.5 rounded-full text-xs font-bold flex items-center gap-1">
+                    <span className="material-symbols-outlined text-xs">analytics</span>
+                    {analysis?.total_responses || generalStats?.total_responses || 0} Phản hồi
+                  </span>
+                  {generalStats?.total_open_feedbacks > 0 && (
+                    <span className="bg-secondary/10 text-secondary px-4 py-1.5 rounded-full text-xs font-bold flex items-center gap-1">
+                      <span className="material-symbols-outlined text-xs">chat</span>
+                      {generalStats.total_open_feedbacks} Câu hỏi mở
+                    </span>
+                  )}
+                  {selectedReport.target_config?.faculty_id && (
+                    <span className="bg-tertiary/10 text-tertiary px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1">
+                      <span className="material-symbols-outlined text-xs">school</span>
+                      Khoa #{selectedReport.target_config.faculty_id}
+                    </span>
+                  )}
+                  {selectedReport.target_config?.subject_id && (
+                    <span className="bg-tertiary/10 text-tertiary px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1">
+                      <span className="material-symbols-outlined text-xs">book</span>
+                      Môn #{selectedReport.target_config.subject_id}
+                    </span>
+                  )}
+                  {selectedReport.target_config?.lecturer_id && (
+                    <span className="bg-tertiary/10 text-tertiary px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1">
+                      <span className="material-symbols-outlined text-xs">person</span>
+                      GV #{selectedReport.target_config.lecturer_id}
+                    </span>
+                  )}
+                </div>
+
+                {/* Row 3: Action Buttons */}
+                <div className="flex flex-wrap gap-2">
                   {/* Export */}
                   <button
                     onClick={handleExportExcel}
@@ -801,18 +825,32 @@ export default function ReportsPage() {
                   </button>
                   {/* AI for closed surveys */}
                   {isClosed && (
-                    <button
-                      onClick={handleRunAI}
-                      disabled={isRunningAI}
-                      className="px-4 py-2.5 bg-secondary text-on-secondary rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-md hover:opacity-90 active:scale-95 transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
-                    >
-                      {isRunningAI ? (
-                        <span className="w-3.5 h-3.5 border-2 border-on-secondary/30 border-t-on-secondary rounded-full animate-spin" />
-                      ) : (
-                        <span className="material-symbols-outlined text-base">auto_awesome</span>
-                      )}
-                      {isRunningAI ? "Đang phân tích..." : "Chạy AI"}
-                    </button>
+                    <>
+                      <button
+                        onClick={handleRunClassify}
+                        disabled={isRunningClassify}
+                        className="px-4 py-2.5 bg-secondary text-on-secondary rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-md hover:opacity-90 active:scale-95 transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                      >
+                        {isRunningClassify ? (
+                          <span className="w-3.5 h-3.5 border-2 border-on-secondary/30 border-t-on-secondary rounded-full animate-spin" />
+                        ) : (
+                          <span className="material-symbols-outlined text-base">label</span>
+                        )}
+                        {isRunningClassify ? "Đang gán nhãn..." : "Gán nhãn cảm xúc"}
+                      </button>
+                      <button
+                        onClick={handleRunTrendAnalysis}
+                        disabled={isRunningTrend}
+                        className="px-4 py-2.5 bg-secondary-container text-on-secondary-container border border-outline-variant/60 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm hover:opacity-90 active:scale-95 transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                      >
+                        {isRunningTrend ? (
+                          <span className="w-3.5 h-3.5 border-2 border-on-secondary-container/30 border-t-on-secondary-container rounded-full animate-spin" />
+                        ) : (
+                          <span className="material-symbols-outlined text-base">insights</span>
+                        )}
+                        {isRunningTrend ? "Đang phân tích..." : "Phân tích xu hướng"}
+                      </button>
+                    </>
                   )}
                   {/* Clarification for closed */}
                   {isClosed && (

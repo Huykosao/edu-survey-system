@@ -94,7 +94,7 @@ def get_ai_report(
             .table("survey_reports")
             .select("*")
             .eq("survey_id", survey_id)
-            .order("created_at", desc=True)
+            .order("generated_at", desc=True)
             .limit(1)
             .execute()
         )
