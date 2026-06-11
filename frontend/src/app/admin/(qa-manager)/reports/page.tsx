@@ -319,7 +319,11 @@ export default function ReportsPage() {
       // Nhập động exceljs từ phiên bản minified cho trình duyệt để tránh lỗi module Node.js
       // @ts-ignore
       const exceljsModule = await import("exceljs/dist/exceljs.min.js");
-      const ExcelJS = exceljsModule.default || exceljsModule;
+      // @ts-ignore
+      const ExcelJS = exceljsModule.default || exceljsModule || window.ExcelJS;
+      if (!ExcelJS || !ExcelJS.Workbook) {
+        throw new Error("Thư viện ExcelJS chưa được tải đúng cách.");
+      }
       const workbook = new ExcelJS.Workbook();
       const sheet = workbook.addWorksheet("Báo cáo phân tích", {
         views: [{ showGridLines: false }], // Ẩn lưới mặc định cho chuyên nghiệp
