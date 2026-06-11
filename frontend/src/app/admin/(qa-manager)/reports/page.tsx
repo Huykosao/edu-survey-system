@@ -358,7 +358,7 @@ export default function ReportsPage() {
     overviewTitleCell.alignment = { vertical: "middle", horizontal: "left" };
 
     const tr1 = sheet.addRow({ cauSo: "", noiDung: "Tổng số phản hồi", val1: analysis.total_responses ?? 0 });
-    const tr2 = sheet.addRow({ cauSo: "", noiDung: "CSAT (Hài lòng tổng thể)", val1: overviewStats?.globalCSAT ? `${overviewStats.globalCSAT}/5.0` : "Không áp dụng" });
+    const tr2 = sheet.addRow({ cauSo: "", noiDung: "CSAT (Hài lòng tổng thể)", val1: (overviewStats?.globalCSAT !== undefined && overviewStats?.globalCSAT !== null) ? `${overviewStats.globalCSAT}/5.0` : "Không áp dụng" });
     const tr3 = sheet.addRow({ cauSo: "", noiDung: "NPS (Chỉ số trung thành)", val1: overviewStats?.npsScore ?? "Không áp dụng" });
     
     // Làm đậm cột B và vẽ viền cho phần tổng quan (động)
