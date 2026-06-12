@@ -38,9 +38,13 @@ interface Improvement {
   title: string;
   content: string;
   created_at: string;
+  surveys?: {
+    title: string;
+  };
 }
 
 // ── Page Component ─────────────────────────────────────────────────────────────
+
 
 export default function SurveyRespondentPage() {
   const router = useRouter();
@@ -435,6 +439,12 @@ export default function SurveyRespondentPage() {
                         <h4 className="font-label-md text-label-md text-on-surface text-base font-bold">
                           {item.title}
                         </h4>
+                        {item.surveys?.title && (
+                          <div className="text-xs text-primary font-semibold flex items-center gap-1.5 mt-0.5">
+                            <span className="material-symbols-outlined text-[15px]" style={{ lineHeight: '1' }}>assignment</span>
+                            <span className="leading-none">Khảo sát: {item.surveys.title}</span>
+                          </div>
+                        )}
                         <p className="font-body-md text-sm text-on-surface-variant leading-relaxed">
                           {item.content}
                         </p>
@@ -467,7 +477,7 @@ export default function SurveyRespondentPage() {
                                 "Giảng viên bộ môn"}
                             </h4>
                             <p className="text-xs text-primary font-semibold mt-0.5">
-                              Môn:{" "}
+                              Khảo sát:{" "}
                               {fb.survey_clarifications?.surveys?.title ||
                                 "Khảo sát học phần"}
                             </p>
@@ -491,6 +501,7 @@ export default function SurveyRespondentPage() {
                   )}
                 </div>
               </div>
+
             )}
           </div>
         ) : (

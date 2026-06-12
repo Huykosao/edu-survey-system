@@ -387,12 +387,55 @@ export default function ReportsPage() {
   }, [analysis]);
 
   const isClosed = selectedReport?.status === "closed" || selectedReport?._statusGroup === "closed";
+  const isResolved = !!selectedReport?.target_config?.is_resolved;
+
+  const closedReports = useMemo(() => {
+    return reports
+      .filter((r) => r._statusGroup === "closed")
+      .sort((a, b) => {
+        const aRes = a.target_config?.is_resolved ? 1 : 0;
+        const bRes = b.target_config?.is_resolved ? 1 : 0;
+        return aRes - bRes;
+      });
+  }, [reports]);
+
+  const publishedReports = useMemo(() => {
+    return reports
+      .filter((r) => r._statusGroup === "published")
+      .sort((a, b) => {
+        const aRes = a.target_config?.is_resolved ? 1 : 0;
+        const bRes = b.target_config?.is_resolved ? 1 : 0;
+        return aRes - bRes;
+      });
+  }, [reports]);
+
+  const handleToggleResolved = async () => {
+    if (!selectedReport) return;
+    const nextResolvedState = !isResolved;
+    try {
+      const updatedConfig = {
+        ...(selectedReport.target_config || {}),
+        is_resolved: nextResolvedState,
+      };
+      await surveysApi.update(selectedReport.id, {
+        target_config: updatedConfig,
+      });
+      setSelectedReport((prev: any) => ({
+        ...prev,
+        target_config: updatedConfig,
+      }));
+      loadReports();
+    } catch (err) {
+      console.error("Lỗi khi cập nhật trạng thái giải quyết:", err);
+      alert("Lỗi khi cập nhật trạng thái giải quyết. Vui lòng thử lại.");
+    }
+  };
 
   const [isRunningClassify, setIsRunningClassify] = useState(false);
   const [isRunningTrend, setIsRunningTrend] = useState(false);
 
   const handleRunClassify = async () => {
-    if (!selectedReport || !isClosed) return;
+    if (!selectedReport || !isClosed || isResolved) return;
     setIsRunningClassify(true);
     setAiRunStatus("Đang chạy phân loại nhãn cảm xúc...");
     try {
@@ -415,7 +458,7 @@ export default function ReportsPage() {
   };
 
   const handleRunTrendAnalysis = async () => {
-    if (!selectedReport || !isClosed) return;
+    if (!selectedReport || !isClosed || isResolved) return;
     setIsRunningTrend(true);
     setAiRunStatus("Đang lập báo cáo tóm tắt xu hướng và đề xuất...");
     try {
@@ -697,10 +740,10 @@ export default function ReportsPage() {
               ))}
             </div>
           ) : (
-            reports.filter(r => r._statusGroup === "closed").length === 0 ? (
+            closedReports.length === 0 ? (
               <p className="text-xs text-outline italic px-1 pb-2">Chưa có khảo sát đóng.</p>
             ) : (
-              reports.filter(r => r._statusGroup === "closed").map((r: any) => (
+              closedReports.map((r: any) => (
                 <button
                   key={r.id}
                   onClick={() => setSelectedReport(r)}
@@ -710,9 +753,16 @@ export default function ReportsPage() {
                       : "border-outline-variant hover:bg-surface-container-low"
                   }`}
                 >
-                  <div className="flex items-center gap-1.5 mb-0.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-slate-400 shrink-0" />
-                    <h4 className="font-bold text-sm text-on-surface line-clamp-2 leading-snug">{r.title}</h4>
+                  <div className="flex items-center justify-between gap-1.5 mb-0.5">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className={`w-1.5 h-1.5 rounded-full ${r.target_config?.is_resolved ? "bg-green-500" : "bg-slate-400"} shrink-0`} />
+                      <h4 className="font-bold text-sm text-on-surface line-clamp-2 leading-snug">{r.title}</h4>
+                    </div>
+                    {r.target_config?.is_resolved && (
+                      <span className="text-[9px] bg-green-100 text-green-800 border border-green-200 px-1.5 py-0.5 rounded-full font-bold shrink-0">
+                        Đã giải quyết
+                      </span>
+                    )}
                   </div>
                   <p className="text-[9px] text-outline mt-1 uppercase font-black tracking-widest flex items-center gap-1">
                     Đã đóng · ID: #{r.id}
@@ -733,10 +783,10 @@ export default function ReportsPage() {
               ))}
             </div>
           ) : (
-            reports.filter(r => r._statusGroup === "published").length === 0 ? (
+            publishedReports.length === 0 ? (
               <p className="text-xs text-outline italic px-1 pb-2">Không có khảo sát đang phát hành.</p>
             ) : (
-              reports.filter(r => r._statusGroup === "published").map((r: any) => (
+              publishedReports.map((r: any) => (
                 <button
                   key={r.id}
                   onClick={() => setSelectedReport(r)}
@@ -746,9 +796,16 @@ export default function ReportsPage() {
                       : "border-outline-variant hover:bg-surface-container-low"
                   }`}
                 >
-                  <div className="flex items-center gap-1.5 mb-0.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
-                    <h4 className="font-bold text-sm text-on-surface line-clamp-2 leading-snug">{r.title}</h4>
+                  <div className="flex items-center justify-between gap-1.5 mb-0.5">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className={`w-1.5 h-1.5 rounded-full ${r.target_config?.is_resolved ? "bg-green-500" : "bg-emerald-500"} shrink-0`} />
+                      <h4 className="font-bold text-sm text-on-surface line-clamp-2 leading-snug">{r.title}</h4>
+                    </div>
+                    {r.target_config?.is_resolved && (
+                      <span className="text-[9px] bg-green-100 text-green-800 border border-green-200 px-1.5 py-0.5 rounded-full font-bold shrink-0">
+                        Đã giải quyết
+                      </span>
+                    )}
                   </div>
                   <p className="text-[9px] text-outline mt-1 uppercase font-black tracking-widest flex items-center gap-1">
                     Đang mở · ID: #{r.id}
@@ -828,7 +885,7 @@ export default function ReportsPage() {
                     <>
                       <button
                         onClick={handleRunClassify}
-                        disabled={isRunningClassify}
+                        disabled={isRunningClassify || isResolved}
                         className="px-4 py-2.5 bg-secondary text-on-secondary rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-md hover:opacity-90 active:scale-95 transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
                       >
                         {isRunningClassify ? (
@@ -840,7 +897,7 @@ export default function ReportsPage() {
                       </button>
                       <button
                         onClick={handleRunTrendAnalysis}
-                        disabled={isRunningTrend}
+                        disabled={isRunningTrend || isResolved}
                         className="px-4 py-2.5 bg-secondary-container text-on-secondary-container border border-outline-variant/60 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm hover:opacity-90 active:scale-95 transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
                       >
                         {isRunningTrend ? (
@@ -856,10 +913,12 @@ export default function ReportsPage() {
                   {isClosed && (
                     <button
                       onClick={() => {
+                        if (isResolved) return;
                         if (suggestedLecturerId) setClarLecturerId(String(suggestedLecturerId));
                         setShowClarificationModal(true);
                       }}
-                      className="px-4 py-2.5 bg-error/10 text-error border border-error/30 rounded-xl text-xs font-bold flex items-center gap-1.5 hover:bg-error/20 active:scale-95 transition-all cursor-pointer"
+                      disabled={isResolved}
+                      className="px-4 py-2.5 bg-error/10 text-error border border-error/30 rounded-xl text-xs font-bold flex items-center gap-1.5 hover:bg-error/20 active:scale-95 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <span className="material-symbols-outlined text-base">report</span>
                       Yêu cầu giải trình
@@ -868,11 +927,31 @@ export default function ReportsPage() {
                   {/* Improvement announcement */}
                   {isClosed && (
                     <button
-                      onClick={() => setShowImprovementModal(true)}
-                      className="px-4 py-2.5 bg-tertiary/10 text-tertiary border border-tertiary/30 rounded-xl text-xs font-bold flex items-center gap-1.5 hover:bg-tertiary/20 active:scale-95 transition-all cursor-pointer"
+                      onClick={() => {
+                        if (isResolved) return;
+                        setShowImprovementModal(true);
+                      }}
+                      disabled={isResolved}
+                      className="px-4 py-2.5 bg-tertiary/10 text-tertiary border border-tertiary/30 rounded-xl text-xs font-bold flex items-center gap-1.5 hover:bg-tertiary/20 active:scale-95 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <span className="material-symbols-outlined text-base">campaign</span>
                       Thông báo cải tiến
+                    </button>
+                  )}
+                  {/* Mark as resolved / reopen */}
+                  {isClosed && (
+                    <button
+                      onClick={handleToggleResolved}
+                      className={`px-4 py-2.5 border rounded-xl text-xs font-bold flex items-center gap-1.5 active:scale-95 transition-all cursor-pointer ${
+                        isResolved
+                          ? "bg-green-100 text-green-800 border-green-300 hover:bg-green-200"
+                          : "bg-surface-container-high text-on-surface border-outline-variant hover:bg-surface-container-highest"
+                      }`}
+                    >
+                      <span className="material-symbols-outlined text-base">
+                        {isResolved ? "check_circle" : "task_alt"}
+                      </span>
+                      {isResolved ? "Đã giải quyết" : "Đánh dấu giải quyết"}
                     </button>
                   )}
                 </div>

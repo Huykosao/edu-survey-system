@@ -62,3 +62,5 @@ class LecturerResponseItem(BaseModel):
     is_published: bool
     approved_by: Optional[int] = None
     created_at: Optional[datetime] = None
+    survey_clarifications: Optional[dict] = None
+

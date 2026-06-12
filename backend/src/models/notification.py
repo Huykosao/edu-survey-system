@@ -29,6 +29,8 @@ class ImprovementResponse(BaseModel):
     target_roles: list[str] = []
     created_by: Optional[int] = None
     created_at: Optional[datetime] = None
+    surveys: Optional[dict] = None
+
 
 
 class CreateImprovementRequest(BaseModel):

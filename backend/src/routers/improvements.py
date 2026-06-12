@@ -23,12 +23,23 @@ router = APIRouter(
 )
 
 
+def check_survey_resolved(survey_id: int):
+    from src.repositories.survey import get_survey_by_id
+    survey = get_survey_by_id(survey_id)
+    if not survey:
+        raise HTTPException(status_code=404, detail="Không tìm thấy bài khảo sát")
+    if (survey.get("target_config") or {}).get("is_resolved"):
+        raise HTTPException(status_code=400, detail="Khảo sát này đã được giải quyết. Không thể thực hiện chức năng này.")
+
+
 @router.post("/improvements", response_model=ImprovementResponse)
 def create_improvement_announcement(
     req: CreateImprovementRequest,
     current_user: dict = Depends(require_admin_or_manager),
 ):
     """Tạo thông báo cải tiến. [MANAGER, ADMIN]"""
+    if req.survey_id:
+        check_survey_resolved(req.survey_id)
     return create_improvement({
         "survey_id": req.survey_id,
         "title": req.title,
@@ -36,6 +47,7 @@ def create_improvement_announcement(
         "target_roles": req.target_roles,
         "created_by": current_user["id"],
     })
+
 
 
 @router.get("/improvements", response_model=list[ImprovementResponse])
