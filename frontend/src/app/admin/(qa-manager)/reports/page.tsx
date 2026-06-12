@@ -272,6 +272,11 @@ export default function ReportsPage() {
   const [isRunningAI, setIsRunningAI] = useState(false);
   const [aiRunStatus, setAiRunStatus] = useState<string | null>(null);
 
+  // Post-survey actions states
+  const [relatedClarifications, setRelatedClarifications] = useState<any[]>([]);
+  const [relatedImprovements, setRelatedImprovements] = useState<any[]>([]);
+  const [loadingPostActions, setLoadingPostActions] = useState(false);
+
   // Clarification modal
   const [showClarificationModal, setShowClarificationModal] = useState(false);
   const [clarLecturerId, setClarLecturerId] = useState("");
@@ -315,7 +320,7 @@ export default function ReportsPage() {
     usersApi.list({ role: "LECTURER", limit: 100 }).then(res => setLecturers(res.data || [])).catch(console.error);
   }, []);
 
-  // Khi chọn khảo sát: load phân tích, stats, AI data
+  // Khi chọn khảo sát: load phân tích, stats, AI data, và thông tin xử lý sau khảo sát
   useEffect(() => {
     if (!selectedReport) return;
     setIsAnalysing(true);
@@ -325,6 +330,9 @@ export default function ReportsPage() {
     setAiReport(null);
     setAiFeedbackByLabel({});
     setSelectedLabel(null);
+    setRelatedClarifications([]);
+    setRelatedImprovements([]);
+    setLoadingPostActions(true);
 
     const currentSid = searchParams.get("sid");
     if (currentSid !== String(selectedReport.id)) {
@@ -344,6 +352,20 @@ export default function ReportsPage() {
     surveysApi.getGeneralStats(sid)
       .then((res: any) => setGeneralStats(res))
       .catch(console.error);
+
+    // Fetch related clarifications and improvements
+    Promise.all([
+      clarificationsApi.listAll().catch(() => [] as any[]),
+      improvementsApi.list().catch(() => [] as any[]),
+    ])
+      .then(([clars, imps]: [any, any]) => {
+        const clarsList = Array.isArray(clars) ? clars : (clars?.data || []);
+        const impsList = Array.isArray(imps) ? imps : (imps?.data || []);
+        setRelatedClarifications(clarsList.filter((c: any) => c.survey_id === sid));
+        setRelatedImprovements(impsList.filter((imp: any) => imp.survey_id === sid));
+      })
+      .catch(console.error)
+      .finally(() => setLoadingPostActions(false));
 
     // If closed, try to load AI data automatically
     if (selectedReport.status === "closed" || selectedReport._statusGroup === "closed") {
@@ -390,28 +412,33 @@ export default function ReportsPage() {
   const isResolved = !!selectedReport?.target_config?.is_resolved;
 
   const closedReports = useMemo(() => {
-    return reports
-      .filter((r) => r._statusGroup === "closed")
-      .sort((a, b) => {
-        const aRes = a.target_config?.is_resolved ? 1 : 0;
-        const bRes = b.target_config?.is_resolved ? 1 : 0;
-        return aRes - bRes;
-      });
+    return reports.filter((r) => r._statusGroup === "closed" && !r.target_config?.is_resolved);
   }, [reports]);
 
   const publishedReports = useMemo(() => {
-    return reports
-      .filter((r) => r._statusGroup === "published")
-      .sort((a, b) => {
-        const aRes = a.target_config?.is_resolved ? 1 : 0;
-        const bRes = b.target_config?.is_resolved ? 1 : 0;
-        return aRes - bRes;
-      });
+    return reports.filter((r) => r._statusGroup === "published" && !r.target_config?.is_resolved);
+  }, [reports]);
+
+  const resolvedReports = useMemo(() => {
+    return reports.filter((r) => !!r.target_config?.is_resolved);
   }, [reports]);
 
   const handleToggleResolved = async () => {
     if (!selectedReport) return;
     const nextResolvedState = !isResolved;
+
+    if (nextResolvedState) {
+      if (relatedImprovements.length === 0) {
+        alert("Khảo sát này chưa có thông báo cải tiến. Bạn cần tạo ít nhất một thông báo cải tiến trước khi đánh dấu đã giải quyết.");
+        return;
+      }
+      const hasUnapproved = relatedClarifications.some((c) => c.status !== "approved");
+      if (hasUnapproved) {
+        alert("Khảo sát này có yêu cầu giải trình chưa được phê duyệt hoàn toàn. Vui lòng phê duyệt tất cả giải trình trước.");
+        return;
+      }
+    }
+
     try {
       const updatedConfig = {
         ...(selectedReport.target_config || {}),
@@ -425,9 +452,10 @@ export default function ReportsPage() {
         target_config: updatedConfig,
       }));
       loadReports();
-    } catch (err) {
+    } catch (err: any) {
       console.error("Lỗi khi cập nhật trạng thái giải quyết:", err);
-      alert("Lỗi khi cập nhật trạng thái giải quyết. Vui lòng thử lại.");
+      const msg = err.message || "Lỗi khi cập nhật trạng thái giải quyết. Vui lòng thử lại.";
+      alert(msg);
     }
   };
 
@@ -492,6 +520,11 @@ export default function ReportsPage() {
       setClarReason("");
       setClarDeadline("");
       alert("Yêu cầu giải trình đã được gửi thành công!");
+      
+      // Refresh clarifications
+      const clars: any = await clarificationsApi.listAll().catch(() => []);
+      const clarsList = Array.isArray(clars) ? clars : (clars?.data || []);
+      setRelatedClarifications(clarsList.filter((c: any) => c.survey_id === selectedReport.id));
     } catch (err) {
       console.error(err);
       alert("Lỗi khi gửi yêu cầu giải trình. Vui lòng thử lại.");
@@ -515,6 +548,11 @@ export default function ReportsPage() {
       setImpTitle("");
       setImpContent("");
       alert("Thông báo cải tiến đã được tạo và gửi thành công!");
+
+      // Refresh improvements
+      const imps: any = await improvementsApi.list().catch(() => []);
+      const impsList = Array.isArray(imps) ? imps : (imps?.data || []);
+      setRelatedImprovements(impsList.filter((imp: any) => imp.survey_id === selectedReport.id));
     } catch (err) {
       console.error(err);
       alert("Lỗi khi tạo thông báo cải tiến.");
@@ -729,51 +767,8 @@ export default function ReportsPage() {
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-lg items-start">
         {/* Sidebar: Danh sách khảo sát */}
         <div className="lg:col-span-1 space-y-sm max-h-[80vh] overflow-y-auto pr-2 sticky top-4 custom-scrollbar">
-          {/* Closed */}
-          <h3 className="text-[10px] font-black uppercase tracking-[0.25em] text-outline px-1 mb-1">
-            Đã đóng
-          </h3>
-          {loading ? (
-            <div className="animate-pulse space-y-3">
-              {[1, 2].map((i) => (
-                <div key={i} className="h-16 bg-surface-container rounded-2xl" />
-              ))}
-            </div>
-          ) : (
-            closedReports.length === 0 ? (
-              <p className="text-xs text-outline italic px-1 pb-2">Chưa có khảo sát đóng.</p>
-            ) : (
-              closedReports.map((r: any) => (
-                <button
-                  key={r.id}
-                  onClick={() => setSelectedReport(r)}
-                  className={`w-full text-left p-md border rounded-2xl transition-all duration-300 cursor-pointer ${
-                    selectedReport?.id === r.id
-                      ? "border-primary bg-primary/5 shadow-md ring-1 ring-primary/20"
-                      : "border-outline-variant hover:bg-surface-container-low"
-                  }`}
-                >
-                  <div className="flex items-center justify-between gap-1.5 mb-0.5">
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <span className={`w-1.5 h-1.5 rounded-full ${r.target_config?.is_resolved ? "bg-green-500" : "bg-slate-400"} shrink-0`} />
-                      <h4 className="font-bold text-sm text-on-surface line-clamp-2 leading-snug">{r.title}</h4>
-                    </div>
-                    {r.target_config?.is_resolved && (
-                      <span className="text-[9px] bg-green-100 text-green-800 border border-green-200 px-1.5 py-0.5 rounded-full font-bold shrink-0">
-                        Đã giải quyết
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-[9px] text-outline mt-1 uppercase font-black tracking-widest flex items-center gap-1">
-                    Đã đóng · ID: #{r.id}
-                  </p>
-                </button>
-              ))
-            )
-          )}
-
           {/* Published */}
-          <h3 className="text-[10px] font-black uppercase tracking-[0.25em] text-outline px-1 mb-1 mt-4">
+          <h3 className="text-[10px] font-black uppercase tracking-[0.25em] text-outline px-1 mb-1">
             Đang phát hành
           </h3>
           {loading ? (
@@ -798,17 +793,91 @@ export default function ReportsPage() {
                 >
                   <div className="flex items-center justify-between gap-1.5 mb-0.5">
                     <div className="flex items-center gap-1.5 min-w-0">
-                      <span className={`w-1.5 h-1.5 rounded-full ${r.target_config?.is_resolved ? "bg-green-500" : "bg-emerald-500"} shrink-0`} />
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
                       <h4 className="font-bold text-sm text-on-surface line-clamp-2 leading-snug">{r.title}</h4>
                     </div>
-                    {r.target_config?.is_resolved && (
-                      <span className="text-[9px] bg-green-100 text-green-800 border border-green-200 px-1.5 py-0.5 rounded-full font-bold shrink-0">
-                        Đã giải quyết
-                      </span>
-                    )}
                   </div>
                   <p className="text-[9px] text-outline mt-1 uppercase font-black tracking-widest flex items-center gap-1">
                     Đang mở · ID: #{r.id}
+                  </p>
+                </button>
+              ))
+            )
+          )}
+
+          {/* Closed */}
+          <h3 className="text-[10px] font-black uppercase tracking-[0.25em] text-outline px-1 mb-1 mt-4">
+            Đã đóng
+          </h3>
+          {loading ? (
+            <div className="animate-pulse space-y-3">
+              {[1, 2].map((i) => (
+                <div key={i} className="h-16 bg-surface-container rounded-2xl" />
+              ))}
+            </div>
+          ) : (
+            closedReports.length === 0 ? (
+              <p className="text-xs text-outline italic px-1 pb-2">Chưa có khảo sát đóng.</p>
+            ) : (
+              closedReports.map((r: any) => (
+                <button
+                  key={r.id}
+                  onClick={() => setSelectedReport(r)}
+                  className={`w-full text-left p-md border rounded-2xl transition-all duration-300 cursor-pointer ${
+                    selectedReport?.id === r.id
+                      ? "border-primary bg-primary/5 shadow-md ring-1 ring-primary/20"
+                      : "border-outline-variant hover:bg-surface-container-low"
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-1.5 mb-0.5">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className="w-1.5 h-1.5 rounded-full bg-slate-400 shrink-0" />
+                      <h4 className="font-bold text-sm text-on-surface line-clamp-2 leading-snug">{r.title}</h4>
+                    </div>
+                  </div>
+                  <p className="text-[9px] text-outline mt-1 uppercase font-black tracking-widest flex items-center gap-1">
+                    Đã đóng · ID: #{r.id}
+                  </p>
+                </button>
+              ))
+            )
+          )}
+
+          {/* Resolved */}
+          <h3 className="text-[10px] font-black uppercase tracking-[0.25em] text-outline px-1 mb-1 mt-4">
+            Đã giải quyết
+          </h3>
+          {loading ? (
+            <div className="animate-pulse space-y-3">
+              {[1, 2].map((i) => (
+                <div key={i} className="h-16 bg-surface-container rounded-2xl" />
+              ))}
+            </div>
+          ) : (
+            resolvedReports.length === 0 ? (
+              <p className="text-xs text-outline italic px-1 pb-2">Chưa có khảo sát đã giải quyết.</p>
+            ) : (
+              resolvedReports.map((r: any) => (
+                <button
+                  key={r.id}
+                  onClick={() => setSelectedReport(r)}
+                  className={`w-full text-left p-md border rounded-2xl transition-all duration-300 cursor-pointer ${
+                    selectedReport?.id === r.id
+                      ? "border-primary bg-primary/5 shadow-md ring-1 ring-primary/20"
+                      : "border-outline-variant hover:bg-surface-container-low"
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-1.5 mb-0.5">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className="w-1.5 h-1.5 rounded-full bg-green-500 shrink-0" />
+                      <h4 className="font-bold text-sm text-on-surface line-clamp-2 leading-snug">{r.title}</h4>
+                    </div>
+                    <span className="text-[9px] bg-green-100 text-green-800 border border-green-200 px-1.5 py-0.5 rounded-full font-bold shrink-0">
+                      Đã giải quyết
+                    </span>
+                  </div>
+                  <p className="text-[9px] text-outline mt-1 uppercase font-black tracking-widest flex items-center gap-1">
+                    {r._statusGroup === "closed" ? "Đã đóng" : "Đang mở"} · ID: #{r.id}
                   </p>
                 </button>
               ))
@@ -824,51 +893,46 @@ export default function ReportsPage() {
               <div className="flex flex-col bg-surface-container-highest/30 p-lg rounded-2xl border border-outline-variant gap-lg shadow-sm">
                 {/* Row 1: Status and Title */}
                 <div className="space-y-xs">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <span className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full border ${
-                      isClosed
+                      isResolved
+                        ? "bg-green-100 text-green-800 border-green-200"
+                        : isClosed
                         ? "bg-slate-100 text-slate-700 border-slate-200"
                         : "bg-emerald-100 text-emerald-800 border-emerald-200"
                     }`}>
-                      {isClosed ? "Đã đóng" : "Đang phát hành"}
+                      {isResolved ? "Đã giải quyết" : isClosed ? "Đã đóng" : "Đang phát hành"}
                     </span>
+                    <span className="text-[10px] text-outline font-bold">ID: #{selectedReport.id}</span>
                   </div>
                   <h2 className="text-2xl font-black text-on-surface tracking-tight">
                     {selectedReport.title}
                   </h2>
                 </div>
 
-                {/* Row 2: Metadata Information */}
-                <div className="flex flex-wrap items-center gap-sm border-t border-b border-outline-variant/20 py-sm">
-                  <span className="bg-primary/10 text-primary px-4 py-1.5 rounded-full text-xs font-bold flex items-center gap-1">
-                    <span className="material-symbols-outlined text-xs">analytics</span>
-                    {analysis?.total_responses || generalStats?.total_responses || 0} Phản hồi
-                  </span>
-                  {generalStats?.total_open_feedbacks > 0 && (
-                    <span className="bg-secondary/10 text-secondary px-4 py-1.5 rounded-full text-xs font-bold flex items-center gap-1">
-                      <span className="material-symbols-outlined text-xs">chat</span>
-                      {generalStats.total_open_feedbacks} Câu hỏi mở
-                    </span>
-                  )}
-                  {selectedReport.target_config?.faculty_id && (
-                    <span className="bg-tertiary/10 text-tertiary px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1">
-                      <span className="material-symbols-outlined text-xs">school</span>
-                      Khoa #{selectedReport.target_config.faculty_id}
-                    </span>
-                  )}
-                  {selectedReport.target_config?.subject_id && (
-                    <span className="bg-tertiary/10 text-tertiary px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1">
-                      <span className="material-symbols-outlined text-xs">book</span>
-                      Môn #{selectedReport.target_config.subject_id}
-                    </span>
-                  )}
-                  {selectedReport.target_config?.lecturer_id && (
-                    <span className="bg-tertiary/10 text-tertiary px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1">
-                      <span className="material-symbols-outlined text-xs">person</span>
-                      GV #{selectedReport.target_config.lecturer_id}
-                    </span>
-                  )}
-                </div>
+                {/* Row 2: Metadata chips — only config info, no duplicate stats */}
+                {(selectedReport.target_config?.faculty_id || selectedReport.target_config?.subject_id || selectedReport.target_config?.lecturer_id) && (
+                  <div className="flex flex-wrap items-center gap-sm border-t border-outline-variant/20 pt-sm">
+                    {selectedReport.target_config?.faculty_id && (
+                      <span className="bg-tertiary/10 text-tertiary px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1">
+                        <span className="material-symbols-outlined text-xs">school</span>
+                        Khoa #{selectedReport.target_config.faculty_id}
+                      </span>
+                    )}
+                    {selectedReport.target_config?.subject_id && (
+                      <span className="bg-tertiary/10 text-tertiary px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1">
+                        <span className="material-symbols-outlined text-xs">book</span>
+                        Môn #{selectedReport.target_config.subject_id}
+                      </span>
+                    )}
+                    {selectedReport.target_config?.lecturer_id && (
+                      <span className="bg-tertiary/10 text-tertiary px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1">
+                        <span className="material-symbols-outlined text-xs">person</span>
+                        GV #{selectedReport.target_config.lecturer_id}
+                      </span>
+                    )}
+                  </div>
+                )}
 
                 {/* Row 3: Action Buttons */}
                 <div className="flex flex-wrap gap-2">
@@ -967,21 +1031,38 @@ export default function ReportsPage() {
 
               {/* General Stats Panel */}
               {generalStats && (
-                <div className={`grid grid-cols-2 ${isClosed ? "sm:grid-cols-3 lg:grid-cols-6" : "sm:grid-cols-2 max-w-sm"} gap-sm`}>
-                  {[
-                    { label: "Phản hồi", value: generalStats.total_responses ?? 0, icon: "group", color: "#6750A4" },
-                    { label: "Câu mở", value: generalStats.total_open_feedbacks ?? 0, icon: "chat", color: "#006A60" },
-                    isClosed && { label: "Nhãn AI", value: generalStats.total_labels ?? 0, icon: "label", color: "#635F70" },
-                    isClosed && { label: "Tích cực", value: generalStats.positive_count ?? 0, icon: "thumb_up", color: "#4CAF50" },
-                    isClosed && { label: "Tiêu cực", value: generalStats.negative_count ?? 0, icon: "thumb_down", color: "#f44336" },
-                    isClosed && { label: "Trung lập", value: generalStats.neutral_count ?? 0, icon: "thumbs_up_down", color: "#9E9E9E" },
-                  ].filter(Boolean).map((stat: any) => (
-                    <div key={stat.label} className="bg-surface-container-lowest border border-outline-variant rounded-xl p-sm flex flex-col items-center gap-1 shadow-sm text-center">
-                      <span className="material-symbols-outlined text-xl" style={{ color: stat.color }}>{stat.icon}</span>
-                      <span className="text-xl font-black text-on-surface">{stat.value}</span>
-                      <span className="text-[9px] font-bold uppercase tracking-wider text-outline">{stat.label}</span>
+                <div className="space-y-sm">
+                  {/* Always-visible base stats */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-sm">
+                    {[
+                      { label: "Phản hồi", value: generalStats.total_responses ?? 0, icon: "group", color: "#6750A4" },
+                      { label: "Câu hỏi mở", value: generalStats.total_open_feedbacks ?? 0, icon: "chat", color: "#006A60" },
+                      isClosed && { label: "Nhãn AI", value: generalStats.total_labels ?? 0, icon: "label", color: "#635F70" },
+                      isClosed && { label: "Đã phân tích", value: (generalStats.positive_count ?? 0) + (generalStats.neutral_count ?? 0) + (generalStats.negative_count ?? 0), icon: "analytics", color: "#005FAF" },
+                    ].filter(Boolean).map((stat: any) => (
+                      <div key={stat.label} className="bg-surface-container-lowest border border-outline-variant rounded-xl p-sm flex flex-col items-center gap-1 shadow-sm text-center min-w-0">
+                        <span className="material-symbols-outlined text-xl" style={{ color: stat.color }}>{stat.icon}</span>
+                        <span className="text-xl font-black text-on-surface">{stat.value}</span>
+                        <span className="text-[9px] font-bold uppercase tracking-wider text-outline leading-tight">{stat.label}</span>
+                      </div>
+                    ))}
+                  </div>
+                  {/* Sentiment breakdown — only when there's AI data */}
+                  {isClosed && (generalStats.positive_count > 0 || generalStats.negative_count > 0 || generalStats.neutral_count > 0) && (
+                    <div className="grid grid-cols-3 gap-sm">
+                      {[
+                        { label: "Tích cực", value: generalStats.positive_count ?? 0, icon: "thumb_up", color: "#4CAF50", bg: "bg-green-50 border-green-200" },
+                        { label: "Trung lập", value: generalStats.neutral_count ?? 0, icon: "thumbs_up_down", color: "#9E9E9E", bg: "bg-slate-50 border-slate-200" },
+                        { label: "Tiêu cực", value: generalStats.negative_count ?? 0, icon: "thumb_down", color: "#f44336", bg: "bg-red-50 border-red-200" },
+                      ].map((stat) => (
+                        <div key={stat.label} className={`border rounded-xl p-sm flex flex-col items-center gap-1 shadow-sm text-center min-w-0 ${stat.bg}`}>
+                          <span className="material-symbols-outlined text-xl" style={{ color: stat.color }}>{stat.icon}</span>
+                          <span className="text-xl font-black text-on-surface">{stat.value}</span>
+                          <span className="text-[9px] font-bold uppercase tracking-wider text-outline leading-tight">{stat.label}</span>
+                        </div>
+                      ))}
                     </div>
-                  ))}
+                  )}
                 </div>
               )}
 
@@ -1214,6 +1295,120 @@ export default function ReportsPage() {
                       </p>
                     </div>
                   )}
+                </div>
+              )}
+
+              {/* Thông tin xử lý sau khảo sát */}
+              {(relatedClarifications.length > 0 || relatedImprovements.length > 0) && (
+                <div className="space-y-md">
+                  <div className="flex items-center gap-2 border-b border-outline-variant/30 pb-sm">
+                    <span className="material-symbols-outlined text-tertiary text-xl">handshake</span>
+                    <h3 className="font-label-md text-label-md font-bold text-tertiary uppercase tracking-wider">
+                      Thông tin xử lý sau khảo sát
+                    </h3>
+                    <span className="text-xs text-outline font-medium">· Các hành động cải tiến & giải trình</span>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-lg">
+                    {/* Yêu cầu giải trình */}
+                    <div className="bg-surface-container-lowest border border-outline-variant/40 p-lg rounded-2xl shadow-sm space-y-md">
+                      <div className="flex items-center gap-2 border-b border-outline-variant/20 pb-xs">
+                        <span className="material-symbols-outlined text-error text-lg">report</span>
+                        <h4 className="text-xs font-black uppercase tracking-wider text-error">
+                          Yêu cầu giải trình ({relatedClarifications.length})
+                        </h4>
+                      </div>
+                      
+                      {relatedClarifications.length === 0 ? (
+                        <p className="text-xs text-outline italic py-4">Chưa có yêu cầu giải trình nào.</p>
+                      ) : (
+                        <div className="space-y-sm max-h-[350px] overflow-y-auto pr-1 custom-scrollbar">
+                          {relatedClarifications.map((clar) => {
+                            const lecturerName = clar.users?.full_name || `Giảng viên #${clar.lecturer_id}`;
+                            const statusConfig: Record<string, { label: string; className: string }> = {
+                              approved: { label: "Đã phê duyệt", className: "bg-emerald-100 text-emerald-800 border-emerald-200" },
+                              rejected: { label: "Yêu cầu lại", className: "bg-red-100 text-red-800 border-red-200" },
+                              submitted: { label: "Chờ phê duyệt", className: "bg-blue-100 text-blue-800 border-blue-200" },
+                              disputed: { label: "Đang khiếu nại", className: "bg-purple-100 text-purple-800 border-purple-200" },
+                              pending: { label: "Chờ giải trình", className: "bg-amber-100 text-amber-800 border-amber-200" },
+                            };
+                            const status = statusConfig[clar.status] || { label: clar.status, className: "bg-slate-100 text-slate-700 border-slate-200" };
+                            
+                            return (
+                              <div key={clar.id} className="p-md bg-surface-container-low border border-outline-variant/50 rounded-xl space-y-sm shadow-sm text-sm">
+                                <div className="flex justify-between items-center flex-wrap gap-xs">
+                                  <span className="font-bold text-on-surface text-xs">{lecturerName}</span>
+                                  <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${status.className}`}>
+                                    {status.label}
+                                  </span>
+                                </div>
+                                <div className="text-xs text-on-surface-variant space-y-1">
+                                  <p><span className="font-semibold">Lý do:</span> {clar.request_reason}</p>
+                                  {clar.deadline && (
+                                    <p><span className="font-semibold">Hạn chót:</span> {new Date(clar.deadline).toLocaleDateString("vi-VN")}</p>
+                                  )}
+                                  {clar.explanation_content && (
+                                    <div className="mt-2 pt-2 border-t border-outline-variant/30 space-y-1">
+                                      <p className="font-semibold text-primary text-[11px] uppercase tracking-wider">Giải trình:</p>
+                                      <p className="italic bg-surface-container/50 p-2 rounded border border-outline-variant/20">{clar.explanation_content}</p>
+                                    </div>
+                                  )}
+                                  {clar.commitment_text && (
+                                    <div className="mt-1 space-y-1">
+                                      <p className="font-semibold text-secondary text-[11px] uppercase tracking-wider">Cam kết cải tiến:</p>
+                                      <p className="italic bg-surface-container/50 p-2 rounded border border-outline-variant/20">&quot;{clar.commitment_text}&quot;</p>
+                                    </div>
+                                  )}
+                                  {clar.admin_comment && (
+                                    <p className="mt-1 text-error"><span className="font-semibold">Ý kiến quản lý:</span> {clar.admin_comment}</p>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Thông báo cải tiến */}
+                    <div className="bg-surface-container-lowest border border-outline-variant/40 p-lg rounded-2xl shadow-sm space-y-md">
+                      <div className="flex items-center gap-2 border-b border-outline-variant/20 pb-xs">
+                        <span className="material-symbols-outlined text-tertiary text-lg">campaign</span>
+                        <h4 className="text-xs font-black uppercase tracking-wider text-tertiary">
+                          Thông báo cải tiến ({relatedImprovements.length})
+                        </h4>
+                      </div>
+                      
+                      {relatedImprovements.length === 0 ? (
+                        <p className="text-xs text-outline italic py-4">Chưa có thông báo cải tiến nào.</p>
+                      ) : (
+                        <div className="space-y-sm max-h-[350px] overflow-y-auto pr-1 custom-scrollbar">
+                          {relatedImprovements.map((imp) => (
+                            <div key={imp.id} className="p-md bg-surface-container-low border border-outline-variant/50 rounded-xl space-y-sm shadow-sm text-sm">
+                              <div className="flex justify-between items-center">
+                                <span className="font-bold text-on-surface text-xs line-clamp-1">{imp.title}</span>
+                                <span className="text-[10px] text-outline font-medium">
+                                  {imp.created_at ? new Date(imp.created_at).toLocaleDateString("vi-VN") : ""}
+                                </span>
+                              </div>
+                              <p className="text-xs text-on-surface-variant leading-relaxed bg-surface-container/50 p-2 rounded border border-outline-variant/20 italic">
+                                {imp.content}
+                              </p>
+                              {imp.target_roles && (
+                                <div className="flex gap-1 flex-wrap">
+                                  {imp.target_roles.map((role: string) => (
+                                    <span key={role} className="text-[9px] font-black uppercase tracking-wider bg-tertiary/10 text-tertiary px-1.5 py-0.5 rounded border border-tertiary/20">
+                                      {role === "STUDENT" ? "Sinh viên" : role === "LECTURER" ? "Giảng viên" : role}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
               )}
 

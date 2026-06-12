@@ -17,7 +17,7 @@ interface Survey {
 export default function SurveysManagerPage() {
   const [surveys, setSurveys] = useState<Survey[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<"all" | "draft" | "published" | "closed">("all");
+  const [activeTab, setActiveTab] = useState<"all" | "draft" | "published" | "closed" | "resolved">("all");
   const [showCreateModal, setShowCreateModal] = useState(false);
 
   // Master Data lists
@@ -394,9 +394,11 @@ export default function SurveysManagerPage() {
     }
   };
 
-  const filteredSurveys = surveys.filter(
-    (s) => activeTab === "all" || s.status === activeTab
-  );
+  const filteredSurveys = surveys.filter((s) => {
+    if (activeTab === "all") return true;
+    if (activeTab === "resolved") return !!s.target_config?.is_resolved;
+    return s.status === activeTab && !s.target_config?.is_resolved;
+  });
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -446,6 +448,7 @@ export default function SurveysManagerPage() {
           { key: "draft", label: "Bản nháp" },
           { key: "published", label: "Đang phát hành" },
           { key: "closed", label: "Đã đóng" },
+          { key: "resolved", label: "Đã giải quyết" },
         ].map((tab) => (
           <button
             key={tab.key}
@@ -481,9 +484,16 @@ export default function SurveysManagerPage() {
             >
               <div>
                 <div className="flex justify-between items-start gap-md mb-sm">
-                  <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${getStatusBadge(survey.status)}`}>
-                    {getStatusLabel(survey.status)}
-                  </span>
+                  <div className="flex gap-1.5 flex-wrap">
+                    <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${getStatusBadge(survey.status)}`}>
+                      {getStatusLabel(survey.status)}
+                    </span>
+                    {survey.target_config?.is_resolved && (
+                      <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold border bg-green-100 text-green-800 border-green-200">
+                        Đã giải quyết
+                      </span>
+                    )}
+                  </div>
                   <span className="text-[11px] text-on-surface-variant">
                     {survey.is_anonymous ? "Ẩn danh" : "Công khai danh tính"}
                   </span>
@@ -527,7 +537,7 @@ export default function SurveysManagerPage() {
                 ) : (
                   // Khảo sát đã public hoặc closed thì KHÔNG cho chỉnh sửa / xóa
                   <>
-                    {survey.status === "published" && (
+                    {survey.status === "published" && !survey.target_config?.is_resolved && (
                       <button
                         onClick={() => handleClose(survey.id)}
                         className="text-xs font-bold text-slate-600 hover:bg-slate-100 px-2 py-1 rounded-lg flex items-center gap-1 cursor-pointer transition-colors"
@@ -535,6 +545,15 @@ export default function SurveysManagerPage() {
                         <span className="material-symbols-outlined text-[16px]">cancel</span>
                         Đóng lại
                       </button>
+                    )}
+                    {(survey.status === "closed" || survey.target_config?.is_resolved) && (
+                      <a
+                        href={`/admin/reports?sid=${survey.id}`}
+                        className="text-xs font-bold text-primary hover:bg-primary/5 px-2 py-1 rounded-lg flex items-center gap-1 cursor-pointer transition-colors"
+                      >
+                        <span className="material-symbols-outlined text-[16px]">analytics</span>
+                        Xem báo cáo
+                      </a>
                     )}
                     <span className="text-[11px] italic text-on-surface-variant">Không thể chỉnh sửa</span>
                   </>

@@ -137,7 +137,7 @@ AnyQuestion = Annotated[
 
 class SurveySection(BaseModel):
     """Một phần/nhóm câu hỏi trong khảo sát."""
-    id: str = Field(..., description="ID section, VD: 's1'")
+    id: Optional[str] = Field(None, description="ID section, VD: 's1'. Tự động tạo nếu thiếu.")
     title: str = Field(..., min_length=1, description="Tiêu đề phần")
     description: Optional[str] = Field(None, description="Mô tả tùy chọn")
     questions: list[AnyQuestion] = Field(
@@ -165,6 +165,11 @@ class SurveyContent(BaseModel):
 
     @model_validator(mode="after")
     def validate_unique_section_and_question_ids(self) -> "SurveyContent":
+        # Auto-generate IDs for sections that don't have one (legacy data support)
+        for i, section in enumerate(self.sections):
+            if not section.id:
+                section.id = f"s{i + 1}"
+
         section_ids = [s.id for s in self.sections]
         if len(section_ids) != len(set(section_ids)):
             raise ValueError("Các section phải có ID duy nhất")
