@@ -1,8 +1,4 @@
-"""
-routers/clarifications.py  (v2 — typed request/response models)
-"""
-
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from src.core.security import get_current_user
 from src.core.middleware import require_admin_or_manager, require_lecturer
 from src.models.clarification import (
@@ -30,6 +26,14 @@ router = APIRouter(
     responses={404: {"description": "Not found"}},
 )
 
+def check_survey_resolved(survey_id: int):
+    from src.repositories.survey import get_survey_by_id
+    survey = get_survey_by_id(survey_id)
+    if not survey:
+        raise HTTPException(status_code=404, detail="Không tìm thấy bài khảo sát")
+    if (survey.get("target_config") or {}).get("is_resolved"):
+        raise HTTPException(status_code=400, detail="Khảo sát này đã được giải quyết. Không thể thực hiện chức năng này.")
+
 
 # ── Manager endpoints ─────────────────────────────────────────────────────────
 
@@ -45,7 +49,9 @@ def create_clarification(
     current_user: dict = Depends(require_admin_or_manager),
 ):
     """Manager tạo yêu cầu giải trình gửi Lecturer. [MANAGER, ADMIN]"""
+    check_survey_resolved(req.survey_id)
     return clar_svc.request_clarification(req.model_dump(mode="json"), current_user["id"])
+
 
 
 @router.post("/clarifications/{cid}/approve", response_model=ClarificationResponse)

@@ -74,7 +74,15 @@ def list_pending_lecturer_responses() -> list[dict]:
         .eq("is_published", False)
         .execute()
     )
-    return result.data or []
+    data = result.data or []
+    for item in data:
+        clar = item.get("survey_clarifications")
+        if clar:
+            if "users!lecturer_id" in clar:
+                clar["users"] = clar.pop("users!lecturer_id")
+            elif "users!survey_clarifications_lecturer_id_fkey" in clar:
+                clar["users"] = clar.pop("users!survey_clarifications_lecturer_id_fkey")
+    return data
 
 
 def list_published_lecturer_responses() -> list[dict]:
@@ -86,7 +94,16 @@ def list_published_lecturer_responses() -> list[dict]:
         .eq("is_published", True)
         .execute()
     )
-    return result.data or []
+    data = result.data or []
+    for item in data:
+        clar = item.get("survey_clarifications")
+        if clar:
+            if "users!survey_clarifications_lecturer_id_fkey" in clar:
+                clar["users"] = clar.pop("users!survey_clarifications_lecturer_id_fkey")
+            elif "users!lecturer_id" in clar:
+                clar["users"] = clar.pop("users!lecturer_id")
+    return data
+
 
 
 def approve_lecturer_response(rid: int, approved_by: int) -> dict:

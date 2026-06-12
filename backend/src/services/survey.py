@@ -165,7 +165,27 @@ def modify_survey(survey_id: int, data: dict) -> dict:
         content_obj = _parse_content(update_data["content"])
         update_data["content"] = content_obj.model_dump(mode="json")
 
+    if "target_config" in update_data and isinstance(update_data["target_config"], dict) and update_data["target_config"].get("is_resolved"):
+        from src.core.database import supabase_client
+        # 1. Check improvements
+        improvements_res = supabase_client.table("improvement_announcements").select("id").eq("survey_id", survey_id).execute()
+        if not improvements_res.data:
+            raise HTTPException(
+                status_code=400,
+                detail="Khảo sát này chưa có thông báo cải tiến. Bạn cần tạo ít nhất một thông báo cải tiến trước khi đánh dấu đã giải quyết."
+            )
+        # 2. Check clarifications
+        clars_res = supabase_client.table("survey_clarifications").select("status").eq("survey_id", survey_id).execute()
+        if clars_res.data:
+            has_unapproved = any(c.get("status") != "approved" for c in clars_res.data)
+            if has_unapproved:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Khảo sát này có yêu cầu giải trình chưa được phê duyệt hoàn toàn. Vui lòng phê duyệt tất cả giải trình trước."
+                )
+
     return survey_repo.update_survey(survey_id, update_data)
+
 
 
 # (Duplicate definitions removed — see above for canonical versions)

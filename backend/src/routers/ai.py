@@ -17,6 +17,14 @@ router = APIRouter(
     responses={404: {"description": "Not found"}},
 )
 
+def check_survey_resolved(survey_id: int):
+    from src.repositories.survey import get_survey_by_id
+    survey = get_survey_by_id(survey_id)
+    if not survey:
+        raise HTTPException(status_code=404, detail="Không tìm thấy bài khảo sát")
+    if (survey.get("target_config") or {}).get("is_resolved"):
+        raise HTTPException(status_code=400, detail="Khảo sát này đã được giải quyết. Không thể thực hiện chức năng này.")
+
 # ── AI Classification ────────────────────────────────────────────────────────
 
 @router.post("/{survey_id}/ai-classify", response_model=MessageResponse)
@@ -33,6 +41,7 @@ def run_ai_classification(
     và gọi AI gán nhãn + phân loại cảm xúc.
     [MANAGER, ADMIN]
     """
+    check_survey_resolved(survey_id)
     try:
         count = classify_survey_process(survey_id, role_id)
         
@@ -65,6 +74,7 @@ def run_ai_trend_analysis(
     AI lập báo cáo tóm tắt xu hướng và gợi ý giải pháp.
     [MANAGER, ADMIN]
     """
+    check_survey_resolved(survey_id)
     try:
         report = generate_trend_analysis(survey_id)
         return report
@@ -75,6 +85,7 @@ def run_ai_trend_analysis(
             status_code=500, 
             detail=f"Lỗi khi khởi tạo AI Report: {str(e)}"
         )
+
 
 
 # ── GET Saved AI Report ───────────────────────────────────────────────────────

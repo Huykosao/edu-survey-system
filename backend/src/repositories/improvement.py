@@ -18,7 +18,7 @@ def create_improvement(data: dict) -> dict:
 def list_improvements() -> list[dict]:
     result = (
         supabase_client.table("improvement_announcements")
-        .select("*")
+        .select("*, surveys(title)")
         .order("created_at", desc=True)
         .execute()
     )
@@ -28,8 +28,9 @@ def list_improvements() -> list[dict]:
 def get_improvement_by_id(iid: int) -> dict | None:
     result = (
         supabase_client.table("improvement_announcements")
-        .select("*")
+        .select("*, surveys(title)")
         .eq("id", iid)
         .execute()
     )
     return result.data[0] if result.data else None
+
