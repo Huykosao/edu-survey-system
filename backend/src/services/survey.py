@@ -165,7 +165,7 @@ def modify_survey(survey_id: int, data: dict) -> dict:
         content_obj = _parse_content(update_data["content"])
         update_data["content"] = content_obj.model_dump(mode="json")
 
-    if "target_config" in update_data and update_data["target_config"].get("is_resolved"):
+    if "target_config" in update_data and isinstance(update_data["target_config"], dict) and update_data["target_config"].get("is_resolved"):
         from src.core.database import supabase_client
         # 1. Check improvements
         improvements_res = supabase_client.table("improvement_announcements").select("id").eq("survey_id", survey_id).execute()
