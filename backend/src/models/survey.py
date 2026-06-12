@@ -61,6 +61,7 @@ class SubmitSurveyResponseRequest(BaseModel):
       - open_ended:      { "q6": "Ý kiến..." }
     """
     subject_id: Optional[int] = None
+    lecturer_id: Optional[int] = None
     answers: dict = Field(
         default_factory=dict,
         description="Dict ánh xạ question_id → câu trả lời theo format tương ứng loại câu hỏi"
@@ -98,6 +99,7 @@ class SurveyResponseItem(BaseModel):
     survey_id: int
     user_id: Optional[int] = None
     subject_id: Optional[int] = None
+    lecturer_id: Optional[int] = None
     answers: dict = {}
     raw_content_text: Optional[str] = None
     submitted_at: Optional[datetime] = None

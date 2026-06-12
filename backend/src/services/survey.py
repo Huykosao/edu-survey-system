@@ -195,7 +195,8 @@ def submit_survey_response(survey_id: int, data: dict, user_id: int) -> dict:
         subject_id=data.get("subject_id"),
         answers=answers,
         raw_content_text=raw_text,
-        is_anonymous=is_anonymous
+        is_anonymous=is_anonymous,
+        lecturer_id=data.get("lecturer_id")
     )
 
     # CHIẾN LƯỢC: Cache Invalidation

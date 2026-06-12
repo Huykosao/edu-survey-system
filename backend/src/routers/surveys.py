@@ -161,3 +161,30 @@ def get_surveys_analysis(
     hoặc Môn học để phục vụ việc giải trình.
     """
     return survey_svc.get_survey_analysis(sid, segment_type, segment_value)
+
+
+@router.get("/surveys/{sid}/general-stats")
+def get_survey_general_stats(
+    sid: int,
+    _: dict = Depends(require_admin_or_manager)
+):
+    """
+    Lấy thống kê chung của khảo sát sử dụng hàm PG (số lượng tham gia, số phản hồi mở, v.v.).
+    [MANAGER, ADMIN]
+    """
+    from src.repositories.ai_report import get_dashboard_overview
+    try:
+        overview = get_dashboard_overview(sid)
+        return overview
+    except Exception as e:
+        # Fallback if function fails or not ready
+        from src.core.database import supabase_client
+        res = supabase_client.table("survey_responses").select("id").eq("survey_id", sid).execute()
+        return {
+            "total_responses": len(res.data) if res.data else 0,
+            "total_open_feedbacks": 0,
+            "total_labels": 0,
+            "positive_count": 0,
+            "negative_count": 0,
+            "neutral_count": 0
+        }

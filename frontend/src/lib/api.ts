@@ -397,6 +397,8 @@ export const surveysApi = {
       `/api/surveys/${id}/analysis${qs ? `?${qs}` : ""}`,
     );
   },
+  getGeneralStats: (id: number) =>
+    apiFetch<Record<string, unknown>>(`/api/surveys/${id}/general-stats`),
 };
 
 // =============================================================
@@ -550,6 +552,10 @@ export const aiApi = {
   /** Lấy tổng quan AI (nhãn, sentiment) */
   getOverview: (surveyId: number) =>
     apiFetch<Record<string, unknown>>(`/api/surveys/${surveyId}/ai-overview`),
+
+  /** Lấy danh sách phản hồi theo nhãn */
+  getFeedbackByLabel: (surveyId: number) =>
+    apiFetch<Record<string, any[]>>(`/api/surveys/${surveyId}/ai-feedback-by-label`),
 };
 
 // =============================================================
@@ -559,9 +565,20 @@ export const labelsApi = {
   listByRole: (roleId: number) =>
     apiFetch<Record<string, unknown>>(`/api/label/${roleId}`),
 
-  create: (data: { role_id: number; label_name: string }) =>
+  create: (data: { role_id: number; label_name: string; label_description?: string }) =>
     apiFetch<Record<string, unknown>>("/api/label", {
       method: "POST",
       body: JSON.stringify(data),
+    }),
+
+  update: (id: number, data: { role_id: number; label_name: string; label_description?: string }) =>
+    apiFetch<Record<string, unknown>>(`/api/label/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+
+  delete: (id: number) =>
+    apiFetch<{ message: string }>(`/api/label/${id}`, {
+      method: "DELETE",
     }),
 };

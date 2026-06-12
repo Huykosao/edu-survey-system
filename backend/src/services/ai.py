@@ -24,6 +24,18 @@ def classify_survey_process(survey_id: int, role_id: int = None):
     # Nếu không truyền role_id từ router, tự động lấy từ cấu hình khảo sát
     if role_id is None:
         role_id = survey_struct.get("target_config", {}).get("role_id")
+        if not role_id:
+            role_name = survey_struct.get("target_config", {}).get("role")
+            if role_name:
+                role_map = {
+                    "ADMIN": 1,
+                    "MANAGER": 2,
+                    "LECTURER": 2,
+                    "ALUMNI": 3,
+                    "STUDENT": 4,
+                    "EMPLOYER": 5
+                }
+                role_id = role_map.get(str(role_name).upper())
     
     if not role_id:
         raise ValueError("Không xác định được Role mục tiêu cho bài khảo sát này.")

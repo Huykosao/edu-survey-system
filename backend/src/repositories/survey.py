@@ -69,7 +69,7 @@ def list_responded_survey_ids(user_id: int) -> set[int]:
     )
     return {row["survey_id"] for row in (result.data or [])}
 
-def submit_response_atomic(survey_id: int, user_id: int, subject_id: int | None, answers: dict, raw_content_text: str, is_anonymous: bool) -> dict:
+def submit_response_atomic(survey_id: int, user_id: int, subject_id: int | None, answers: dict, raw_content_text: str, is_anonymous: bool, lecturer_id: int | None = None) -> dict:
     """Sử dụng RPC để submit response và record participation trong một transaction."""
     try:
         result = supabase_client.rpc('submit_survey_response_tx', {
@@ -78,7 +78,8 @@ def submit_response_atomic(survey_id: int, user_id: int, subject_id: int | None,
             'p_subject_id': subject_id,
             'p_answers': answers,
             'p_raw_content_text': raw_content_text,
-            'p_is_anonymous': is_anonymous
+            'p_is_anonymous': is_anonymous,
+            'p_lecturer_id': lecturer_id
         }).execute()
         data = result.data
         if isinstance(data, list) and len(data) > 0:
