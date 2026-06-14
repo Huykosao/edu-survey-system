@@ -273,7 +273,7 @@ def generate_trend_analysis(survey_id: int):
                 for row_label, col_dist in rows_data.items():
                     row_total = sum(col_dist.values()) if col_dist else 0
                     col_parts = []
-                    for col, cnt in sorted(col_dist.items(), key=lambda x: -x[1]):
+                    for col, cnt in sorted((col_dist or {}).items(), key=lambda x: -x[1]):
                         pct = round(cnt / row_total * 100, 1) if row_total else 0
                         col_parts.append(f"{col}: {cnt} ({pct}%)")
                     row_lines.append(f"  - {row_label}: " + " | ".join(col_parts))
