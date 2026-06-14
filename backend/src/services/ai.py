@@ -155,7 +155,9 @@ def generate_trend_analysis(survey_id: int):
         # =====================================================
         # 1. LOAD DATA & FILTER SPAM
         # =====================================================
-        survey = survey_repo.get_survey_by_id(survey_id) or {}
+        survey = survey_repo.get_survey_by_id(survey_id)
+        if not survey:
+            raise ValueError(f"Không tìm thấy khảo sát có ID {survey_id}")
         survey_title = survey.get("title", f"Khảo sát #{survey_id}")
         survey_desc = survey.get("description") or ""
 
