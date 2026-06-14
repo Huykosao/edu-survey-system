@@ -224,6 +224,13 @@ def submit_survey_response(survey_id: int, data: dict, user_id: int) -> dict:
     # Điều này an toàn tuyệt đối trong môi trường đồng thời cao
     survey_repo.delete_survey_stats(survey_id)
 
+    # Lấy thông tin phản hồi đầy đủ để FastAPI validate theo model SurveyResponseItem
+    from src.core.database import supabase_client
+    if new_response and "id" in new_response:
+        full_res = supabase_client.table("survey_responses").select("*").eq("id", new_response["id"]).maybe_single().execute()
+        if full_res.data:
+            return full_res.data
+
     return new_response
 
 

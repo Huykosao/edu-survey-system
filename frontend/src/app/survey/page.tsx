@@ -146,9 +146,39 @@ export default function SurveyRespondentPage() {
     setAnswers((prev) => ({ ...prev, [questionId]: value }));
   };
 
+  // Validate phía client trước khi submit
+  const validateAnswers = (): string[] => {
+    if (!selectedSurvey?.content?.sections) return [];
+    const errors: string[] = [];
+    const allQs = getAllQuestions(selectedSurvey.content);
+    allQs.forEach((q, idx) => {
+      if (!q.required) return; // Bỏ qua câu không bắt buộc
+      const answer = answers[q.id];
+      const isEmpty =
+        answer === undefined ||
+        answer === null ||
+        answer === "" ||
+        (Array.isArray(answer) && answer.length === 0) ||
+        (typeof answer === "object" && !Array.isArray(answer) && Object.keys(answer as object).length === 0);
+      if (isEmpty) {
+        errors.push(`Câu ${idx + 1}: "${q.label}" là bắt buộc, vui lòng trả lời trước khi nộp.`);
+      }
+    });
+    return errors;
+  };
+
   const handleSubmitSurvey = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedSurvey) return;
+
+    // 1. Validate phía client trước
+    const clientErrors = validateAnswers();
+    if (clientErrors.length > 0) {
+      setSubmitError(clientErrors.join("\n"));
+      // Cuộn lên phần lỗi
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
 
     setSubmitting(true);
     setSubmitError(null);
@@ -169,14 +199,22 @@ export default function SurveyRespondentPage() {
       await responsesApi.submit(selectedSurvey.id, submitPayload);
       setShowSuccess(true);
     } catch (err: any) {
-      const detail = err?.data?.detail;
-      if (detail && typeof detail === "object" && detail.errors) {
+      // Parse lỗi từ nhiều cấu trúc response khác nhau
+      const errData = err?.response?.data ?? err?.data ?? err;
+      const detail = errData?.detail;
+      if (detail && typeof detail === "object" && Array.isArray(detail.errors)) {
         setSubmitError((detail.errors as string[]).join("\n"));
+      } else if (detail && typeof detail === "object" && detail.message) {
+        const msgs: string[] = Array.isArray(detail.errors) ? detail.errors : [];
+        setSubmitError(msgs.length > 0 ? msgs.join("\n") : String(detail.message));
       } else if (typeof detail === "string") {
         setSubmitError(detail);
+      } else if (typeof err?.message === "string" && err.message) {
+        setSubmitError(err.message);
       } else {
         setSubmitError("Có lỗi xảy ra khi gửi khảo sát. Vui lòng thử lại.");
       }
+      window.scrollTo({ top: 0, behavior: "smooth" });
     } finally {
       setSubmitting(false);
     }
@@ -532,9 +570,23 @@ export default function SurveyRespondentPage() {
 
             {/* Error */}
             {submitError && (
-              <div className="bg-error/8 border border-error/30 text-error rounded-xl p-md text-sm whitespace-pre-line">
-                <p className="font-bold mb-1">Vui lòng kiểm tra lại:</p>
-                {submitError}
+              <div className="bg-error/8 border border-error/30 text-error rounded-xl p-md text-sm">
+                <div className="flex items-start gap-2">
+                  <span className="material-symbols-outlined shrink-0 mt-0.5" style={{ fontSize: '18px', lineHeight: '1' }}>
+                    error
+                  </span>
+                  <div className="flex-1">
+                    <p className="font-bold mb-1">Vui lòng kiểm tra lại trước khi nộp:</p>
+                    <ul className="list-none space-y-0.5">
+                      {submitError.split("\n").map((line, i) => (
+                        <li key={i} className="flex items-start gap-1">
+                          <span className="shrink-0 mt-1">•</span>
+                          <span>{line}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
               </div>
             )}
 

@@ -150,12 +150,20 @@ def generate_trend_analysis(survey_id: int):
     print("==============================\n")
 
     try:
+        from src.services.survey import get_survey_analysis
 
         # =====================================================
-        # 1. LOAD DATA
+        # 1. LOAD DATA & FILTER SPAM
         # =====================================================
+        survey = survey_repo.get_survey_by_id(survey_id)
+        if not survey:
+            raise ValueError(f"Không tìm thấy khảo sát có ID {survey_id}")
+        survey_title = survey.get("title", f"Khảo sát #{survey_id}")
+        survey_desc = survey.get("description") or ""
 
-        stats = survey_repo.get_survey_stats_data(survey_id) or {}
+        analysis_data = get_survey_analysis(survey_id)
+        q_analysis = analysis_data.get("analysis", {}) or {}
+
         overview = (
             ai_report.get_dashboard_overview(
                 survey_id
@@ -166,6 +174,12 @@ def generate_trend_analysis(survey_id: int):
                 survey_id
             ) or []
         )
+        # Loại bỏ nhãn spam khỏi thống kê theo nhãn
+        label_summary = [
+            row for row in label_summary
+            if "spam" not in str(row.get("label_name") or "").lower()
+        ]
+
         question_summary = (
             ai_report.get_question_sentiment_summary(
                 survey_id
@@ -177,8 +191,14 @@ def generate_trend_analysis(survey_id: int):
                 limit=50
             ) or []
         )
+        # Loại bỏ tất cả câu trả lời có nhãn là spam
+        feedback_examples = [
+            fb for fb in feedback_examples
+            if "spam" not in str(fb.get("label_name") or "").lower()
+        ]
+
         if (
-            not stats
+            not q_analysis
             and not label_summary
             and not feedback_examples
         ):
@@ -190,52 +210,87 @@ def generate_trend_analysis(survey_id: int):
         # 2. QUANTITATIVE ANALYSIS
         # =====================================================
         stats_lines = []
-        q_analysis = (
-            stats.get(
-                "question_analysis",
-                {}
-            ) or {}
-        )
 
+        q_idx = 0
         for q_id, info in q_analysis.items():
-
-            q_label = info.get(
-                "question_label"
-            )
-
-            q_stats = info.get(
-                "stats",
-                {}
-            )
-
-            stype = info.get(
-                "question_type"
-            )
+            q_idx += 1
+            q_label = info.get("question_label") or q_id
+            q_stats = info.get("stats", {}) or {}
+            stype = info.get("question_type")
+            total = q_stats.get("total", 0) or 0
 
             if stype == "likert":
-
+                dist = q_stats.get("score_distribution", {}) or {}
+                dist_lines = []
+                for score in range(1, 6):
+                    count = dist.get(str(score), 0)
+                    pct = round(count / total * 100, 1) if total else 0
+                    dist_lines.append(f"  - Mức {score}: {count} phiếu ({pct}%)")
                 stats_lines.append(
-                    f"""
-{q_label}
-- Điểm trung bình: {q_stats.get('average')}/5
-- Phân phối: {q_stats.get('score_distribution')}
-""".strip()
+                    f"Câu {q_idx}: {q_label}\n"
+                    f"- Loại: Thang đo Likert (1–5)\n"
+                    f"- Tổng phản hồi: {total}\n"
+                    f"- Điểm trung bình: {q_stats.get('average', 'N/A')}/5\n"
+                    f"- Phân phối:\n" + "\n".join(dist_lines)
                 )
 
             elif stype == "nps":
-
+                dist = q_stats.get("distribution", {}) or {}
+                promoters = dist.get("promoters", 0)
+                detractors = dist.get("detractors", 0)
+                passives = dist.get("passives", 0)
+                p_pct = round(promoters / total * 100, 1) if total else 0
+                d_pct = round(detractors / total * 100, 1) if total else 0
+                pa_pct = round(passives / total * 100, 1) if total else 0
                 stats_lines.append(
-                    f"""
-{q_label}
-- NPS: {q_stats.get('score')}
-- Distribution:
-{q_stats.get('distribution')}
-""".strip()
+                    f"Câu {q_idx}: {q_label}\n"
+                    f"- Loại: NPS (0–10)\n"
+                    f"- Tổng phản hồi: {total}\n"
+                    f"- Điểm NPS: {q_stats.get('score', 'N/A')}\n"
+                    f"- Phân phối:\n"
+                    f"  - Ủng hộ (Promoter 9–10): {promoters} ({p_pct}%)\n"
+                    f"  - Trung lập (Passive 7–8): {passives} ({pa_pct}%)\n"
+                    f"  - Không hài lòng (Detractor 0–6): {detractors} ({d_pct}%)"
                 )
 
-        print(
-            f"[6] Quantitative blocks: {len(stats_lines)}"
-        )
+            elif stype in ("single_choice", "multiple_choice"):
+                dist = q_stats.get("distribution", {}) or {}
+                dist_lines = []
+                for option, count in sorted(dist.items(), key=lambda x: -x[1]):
+                    pct = round(count / total * 100, 1) if total else 0
+                    dist_lines.append(f"  - \"{option}\": {count} lượt ({pct}%)")
+                type_label = "Trắc nghiệm một đáp án" if stype == "single_choice" else "Trắc nghiệm nhiều đáp án"
+                stats_lines.append(
+                    f"Câu {q_idx}: {q_label}\n"
+                    f"- Loại: {type_label}\n"
+                    f"- Tổng phiếu trả lời: {total}\n"
+                    f"- Phân phối lựa chọn:\n" + ("\n".join(dist_lines) if dist_lines else "  (Chưa có dữ liệu)")
+                )
+
+            elif stype == "matrix":
+                rows_data = q_stats.get("rows_data", {}) or {}
+                row_lines = []
+                for row_label, col_dist in rows_data.items():
+                    row_total = sum(col_dist.values()) if col_dist else 0
+                    col_parts = []
+                    for col, cnt in sorted((col_dist or {}).items(), key=lambda x: -x[1]):
+                        pct = round(cnt / row_total * 100, 1) if row_total else 0
+                        col_parts.append(f"{col}: {cnt} ({pct}%)")
+                    row_lines.append(f"  - {row_label}: " + " | ".join(col_parts))
+                stats_lines.append(
+                    f"Câu {q_idx}: {q_label}\n"
+                    f"- Loại: Ma trận đánh giá\n"
+                    f"- Tổng phiếu: {total}\n"
+                    f"- Phân phối theo tiêu chí:\n" + ("\n".join(row_lines) if row_lines else "  (Chưa có dữ liệu)")
+                )
+
+            elif stype == "open_ended":
+                stats_lines.append(
+                    f"Câu {q_idx}: {q_label}\n"
+                    f"- Loại: Câu hỏi mở\n"
+                    f"- Tổng phản hồi: {total}"
+                )
+
 
         # =====================================================
         # 3. OVERVIEW
@@ -356,6 +411,11 @@ Câu hỏi mở: {row['question_id']}
         # 7. BUILD CONTEXT
         # =====================================================
         analysis_context = f"""
+=== SURVEY INFO ===
+Tên khảo sát: {survey_title}
+Mã khảo sát: {survey_id}
+Mô tả khảo sát: {survey_desc}
+
 === DASHBOARD OVERVIEW ===
 
 {chr(10).join(overview_lines)}
