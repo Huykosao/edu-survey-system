@@ -28,7 +28,8 @@ router = APIRouter(
 
 
 @router.post("/login")
-def login(login_req: LoginRequest):
+@limiter.limit("10/minute")
+def login(login_req: LoginRequest, request: Request):
     """Đăng nhập bằng email + password. Trả về access_token và thông tin user."""
     user = get_user_by_email(login_req.email)
     if not user:
@@ -77,7 +78,13 @@ def change_password(
     current_user: dict = Depends(get_current_user),
 ):
     """Đổi mật khẩu cho user hiện tại."""
-    stored_hash = current_user.get("password_hash", "")
+    # Lấy password_hash trực tiếp từ DB (get_current_user không trả về trường này)
+    from src.core.database import supabase_client
+    user_row = supabase_client.table("users").select("password_hash").eq("id", current_user["id"]).execute()
+    if not user_row.data:
+        raise HTTPException(status_code=401, detail="Người dùng không tồn tại")
+    
+    stored_hash = user_row.data[0].get("password_hash", "")
     if isinstance(stored_hash, str):
         stored_hash = stored_hash.encode("utf-8")
 
@@ -86,6 +93,12 @@ def change_password(
 
     if len(req.new_password) < 6:
         raise HTTPException(status_code=400, detail="Mật khẩu mới phải có ít nhất 6 ký tự")
+
+    import re
+    if not re.search(r'[A-Z]', req.new_password):
+        raise HTTPException(status_code=400, detail="Mật khẩu mới phải chứa ít nhất 1 chữ hoa")
+    if not re.search(r'[0-9]', req.new_password):
+        raise HTTPException(status_code=400, detail="Mật khẩu mới phải chứa ít nhất 1 chữ số")
 
     new_hash = hash_password(req.new_password)
     update_password_hash(

@@ -34,6 +34,8 @@ function EditUserForm() {
   const [toastMessage, setToastMessage] = useState("");
 
   const [loading, setLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const [faculties, setFaculties] = useState<{ id: number; name: string }[]>([]);
 
@@ -75,6 +77,7 @@ function EditUserForm() {
 
   const handleSave = async () => {
     if (!userId) return;
+    setIsSaving(true);
     try {
       let role_id = 4; // student
       if (profile.role === "admin") role_id = 1;
@@ -98,6 +101,8 @@ function EditUserForm() {
       }, 1500);
     } catch (err) {
       console.error("Error saving user:", err);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -107,6 +112,7 @@ function EditUserForm() {
 
   const handleDelete = async () => {
     if (!userId) return;
+    setIsDeleting(true);
     try {
       await usersApi.delete(parseInt(userId));
       setToastMessage("Tài khoản người dùng đã bị xóa vĩnh viễn.");
@@ -117,6 +123,8 @@ function EditUserForm() {
       }, 1500);
     } catch (err) {
       console.error("Error deleting user:", err);
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -152,9 +160,16 @@ function EditUserForm() {
             </button>
             <button
               onClick={handleSave}
-              className="px-6 py-2 bg-primary text-on-primary rounded-lg text-label-md font-label-md hover:bg-primary-container hover:text-on-primary-container shadow-sm transition-colors cursor-pointer"
+              disabled={isSaving || isDeleting}
+              className="px-6 py-2 bg-primary text-on-primary rounded-lg text-label-md font-label-md hover:bg-primary-container hover:text-on-primary-container shadow-sm transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
             >
-              Lưu thay đổi
+              {isSaving && (
+                <svg className="animate-spin h-4 w-4 text-current" viewBox="0 0 24 24" fill="none">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+              )}
+              <span>{isSaving ? "Đang lưu..." : "Lưu thay đổi"}</span>
             </button>
           </div>
         </div>
@@ -388,9 +403,16 @@ function EditUserForm() {
               <button
                 type="button"
                 onClick={handleDelete}
-                className="flex-1 py-2 bg-error text-on-error rounded-lg text-label-md font-label-md hover:bg-error/90 transition-colors shadow-sm cursor-pointer"
+                disabled={isDeleting}
+                className="flex-1 py-2 bg-error text-on-error rounded-lg text-label-md font-label-md hover:bg-error/90 transition-colors shadow-sm cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5"
               >
-                Xóa ngay lập tức
+                {isDeleting && (
+                  <svg className="animate-spin h-4 w-4 text-current" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                )}
+                <span>{isDeleting ? "Đang xóa..." : "Xóa ngay lập tức"}</span>
               </button>
             </div>
           </div>

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { usersApi, facultiesApi } from "@/lib/api";
+import { usersApi, facultiesApi, ApiError } from "@/lib/api";
 
 interface User {
   id: string;
@@ -51,6 +51,8 @@ export default function UserManagementPage() {
   const [newPhone, setNewPhone] = useState("");
   const [newFacultyId, setNewFacultyId] = useState<number | "">("");
   const [newRole, setNewRole] = useState<"Sinh viên" | "Giảng viên" | "Quản lý" | "Quản trị viên" | "Cựu sinh viên" | "Nhà tuyển dụng">("Sinh viên");
+  const [addError, setAddError] = useState("");
+  const [isAdding, setIsAdding] = useState(false);
 
   const [faculties, setFaculties] = useState<{ id: number; name: string }[]>([]);
 
@@ -166,6 +168,8 @@ export default function UserManagementPage() {
     else if (newRole === "Cựu sinh viên") roleIds = [5];
     else if (newRole === "Nhà tuyển dụng") roleIds = [6];
 
+    setIsAdding(true);
+    setAddError("");
     try {
       await usersApi.create({
         full_name: newName,
@@ -183,8 +187,15 @@ export default function UserManagementPage() {
       setNewRole("Sinh viên");
       setShowAddModal(false);
       loadUsers();
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error creating user:", err);
+      if (err instanceof ApiError) {
+        setAddError(err.message);
+      } else {
+        setAddError(err?.message || "Có lỗi xảy ra khi tạo người dùng");
+      }
+    } finally {
+      setIsAdding(false);
     }
   };
 
@@ -394,7 +405,7 @@ export default function UserManagementPage() {
             <span>Import Excel</span>
           </button>
           <button
-            onClick={() => setShowAddModal(true)}
+            onClick={() => { setAddError(""); setShowAddModal(true); }}
             className="flex-1 md:flex-initial bg-primary text-on-primary px-3 py-2 md:px-4 md:py-3 rounded-lg font-label-md text-label-md flex items-center justify-center gap-2 hover:bg-primary-container hover:text-on-primary-container transition-colors shadow-sm cursor-pointer"
           >
             <span className="material-symbols-outlined text-[20px]">person_add</span>
@@ -821,6 +832,12 @@ export default function UserManagementPage() {
             <h3 className="font-headline-md text-headline-md text-primary font-bold border-b border-outline-variant/40 pb-sm mb-sm">
               Thêm Người Dùng Mới
             </h3>
+            {addError && (
+              <div className="flex items-start gap-2 p-3 bg-error-container/40 border border-error/20 rounded-lg text-on-error-container text-xs font-medium animate-in fade-in duration-200 mb-sm">
+                <span className="material-symbols-outlined text-error text-[16px] mt-0.5">error</span>
+                <span>{addError}</span>
+              </div>
+            )}
             <form onSubmit={handleAddUser} className="flex flex-col gap-md">
               <div className="flex flex-col gap-xs">
                 <label className="text-label-md font-semibold text-on-surface-variant" htmlFor="user-name">Họ và tên</label>
@@ -909,9 +926,16 @@ export default function UserManagementPage() {
                 </button>
                 <button
                   type="submit"
-                  className="px-md py-2 bg-primary text-on-primary rounded-lg text-label-md font-label-md hover:bg-primary-container hover:text-on-primary-container transition-colors shadow-sm cursor-pointer"
+                  disabled={isAdding}
+                  className="px-md py-2 bg-primary text-on-primary rounded-lg text-label-md font-label-md hover:bg-primary-container hover:text-on-primary-container transition-colors shadow-sm cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
                 >
-                  Tạo người dùng
+                  {isAdding && (
+                    <svg className="animate-spin h-4 w-4 text-current" viewBox="0 0 24 24" fill="none">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                  )}
+                  <span>{isAdding ? "Đang tạo..." : "Tạo người dùng"}</span>
                 </button>
               </div>
             </form>

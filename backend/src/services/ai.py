@@ -145,9 +145,7 @@ from collections import defaultdict
 
 def generate_trend_analysis(survey_id: int):
 
-    print("\n==============================")
-    print(f"START AI REPORT survey_id={survey_id}")
-    print("==============================\n")
+    logger.info(f"START AI REPORT survey_id={survey_id}")
 
     try:
         from src.services.survey import get_survey_analysis
