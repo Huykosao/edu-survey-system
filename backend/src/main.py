@@ -5,12 +5,16 @@ Entry point FastAPI — đăng ký tất cả routers.
 Mỗi router chỉ xử lý HTTP, không chứa business logic.
 """
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 
 from src.config import env
 from src.config.logging import setup_logging
+from src.core.limiter import limiter, rate_limit_error_handler
 
 from src.routers.auth import router as auth_router
 from src.routers.users import router as users_router
@@ -30,7 +34,12 @@ app = FastAPI(
     version="1.0.0",
 )
 
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, rate_limit_error_handler)
+
 setup_logging()
+
+app.add_middleware(SlowAPIMiddleware)
 
 app.add_middleware(
     CORSMiddleware,

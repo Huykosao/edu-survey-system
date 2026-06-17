@@ -2,7 +2,7 @@
 routers/users.py  (v2 — typed request/response models)
 """
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, BackgroundTasks
 from typing import Optional
 
 from src.core.security import get_current_user
@@ -65,7 +65,11 @@ def get_user(user_id: int, _: dict = Depends(require_admin_or_manager)):
 
 
 @router.post("/users", response_model=UserPublicResponse)
-def create_user(req: CreateUserRequest, current_user: dict = Depends(require_admin)):
+def create_user(
+    req: CreateUserRequest,
+    background_tasks: BackgroundTasks,
+    current_user: dict = Depends(require_admin)
+):
     """Tạo user mới. [ADMIN]"""
     from src.repositories.user import upsert_profile_details, delete_user
     from src.core.database import supabase_client
@@ -85,6 +89,15 @@ def create_user(req: CreateUserRequest, current_user: dict = Depends(require_adm
         if profile_data:
             upsert_profile_details(user_id, profile_data)
             
+        # Gửi email thông tin tài khoản dưới nền
+        from src.services.email import send_account_creation_email
+        background_tasks.add_task(
+            send_account_creation_email,
+            req.email,
+            req.password,
+            req.full_name
+        )
+            
         from src.services.user import sanitize_user
         return sanitize_user(new_user, roles)
     except Exception as e:
@@ -98,7 +111,11 @@ def create_user(req: CreateUserRequest, current_user: dict = Depends(require_adm
 
 
 @router.post("/users/bulk")
-def bulk_create_users(req: BulkCreateUserRequest, _: dict = Depends(require_admin)):
+def bulk_create_users(
+    req: BulkCreateUserRequest,
+    background_tasks: BackgroundTasks,
+    _: dict = Depends(require_admin)
+):
     """Tạo nhiều user cùng lúc từ file Excel. [ADMIN]"""
     from src.services.auth import create_user_service
     from src.repositories.role import set_user_roles
@@ -137,6 +154,15 @@ def bulk_create_users(req: BulkCreateUserRequest, _: dict = Depends(require_admi
 
             if profile_data:
                 upsert_profile_details(user_id, profile_data)
+                
+            # Gửi email thông tin tài khoản dưới nền
+            from src.services.email import send_account_creation_email
+            background_tasks.add_task(
+                send_account_creation_email,
+                user_req.email,
+                user_req.password,
+                user_req.full_name
+            )
                 
             success_count += 1
         except Exception as e:
