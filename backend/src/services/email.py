@@ -44,7 +44,7 @@ def send_email(subject: str, recipient: str, html_content: str) -> bool:
         # Gửi qua SSL hoặc STARTTLS tùy cấu hình
         if env.SMTP_USE_SSL:
             context = ssl.create_default_context()
-            with smtplib.SMTP_SSL(env.SMTP_HOST, env.SMTP_PORT, context=context) as server:
+            with smtplib.SMTP_SSL(env.SMTP_HOST, env.SMTP_PORT, context=context, timeout=10) as server:
                 server.login(env.SMTP_USERNAME, env.SMTP_PASSWORD)
                 server.sendmail(env.SMTP_SENDER, [recipient], msg.as_string())
         else:
