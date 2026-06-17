@@ -104,15 +104,16 @@ export default function ForgotPasswordPage() {
             href="/login"
             className="w-full h-[48px] mt-2 rounded-xl font-semibold text-[14px] text-on-primary bg-primary transition-all shadow-md cursor-pointer flex items-center justify-center gap-2 hover:bg-primary-container hover:text-on-primary-container active:scale-[0.98]"
           >
+            <span className="material-symbols-outlined text-[18px]">arrow_back</span>
             Quay lại Đăng nhập
           </Link>
         )}
 
         {!isSuccess && (
           <div className="mt-8 text-center border-t border-outline-variant/30 pt-6">
-            <Link href="/login" className="text-[13px] font-semibold text-primary hover:underline inline-flex items-center gap-1">
-              <span className="material-symbols-outlined text-[16px]">arrow_back</span>
-              Quay lại đăng nhập
+            <Link href="/login" className="text-[13px] font-semibold text-primary inline-flex items-center gap-1 group">
+              <span className="material-symbols-outlined" style={{ fontSize: '14px', lineHeight: '1' }}>arrow_back</span>
+              <span className="group-hover:underline">Quay lại đăng nhập</span>
             </Link>
           </div>
         )}

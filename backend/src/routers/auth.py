@@ -5,7 +5,8 @@ Router xác thực: login, logout, me, đổi mật khẩu.
 Chỉ xử lý HTTP request/response — business logic nằm ở services.
 """
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request
+from src.core.limiter import limiter
 
 from src.models.auth import LoginRequest, ChangePasswordRequest
 from pydantic import BaseModel, EmailStr
@@ -138,9 +139,10 @@ class ForgotPasswordRequest(BaseModel):
     email: EmailStr
 
 @router.post("/forgot-password")
-def forgot_password(req: ForgotPasswordRequest):
-    """Tạo mật khẩu ngẫu nhiên và gửi qua email."""
-    import random
+@limiter.limit("3/minute")
+def forgot_password(req: ForgotPasswordRequest, request: Request, background_tasks: BackgroundTasks):
+    """Tạo mật khẩu ngẫu nhiên mạnh và gửi qua email."""
+    import secrets
     import string
     
     user = get_user_by_email(req.email)
@@ -148,9 +150,23 @@ def forgot_password(req: ForgotPasswordRequest):
         # Prevent email enumeration
         return {"message": "Nếu email hợp lệ, mật khẩu mới sẽ được gửi đến hộp thư của bạn."}
         
-    # Generate random 8-char password
-    characters = string.ascii_letters + string.digits + "!@#$%^&*"
-    new_password = "".join(random.choice(characters) for i in range(8))
+    # Tạo mật khẩu ngẫu nhiên mạnh (12 ký tự, đầy đủ chữ hoa, chữ thường, số, ký tự đặc biệt)
+    lowercase = string.ascii_lowercase
+    uppercase = string.ascii_uppercase
+    digits = string.digits
+    special = "!@#$%^&*"
+    all_chars = lowercase + uppercase + digits + special
+    
+    pwd_list = [
+        secrets.choice(lowercase),
+        secrets.choice(uppercase),
+        secrets.choice(digits),
+        secrets.choice(special)
+    ]
+    pwd_list += [secrets.choice(all_chars) for _ in range(8)]
+    import random
+    random.SystemRandom().shuffle(pwd_list)
+    new_password = "".join(pwd_list)
     
     # Save the new password
     new_hash = hash_password(new_password)
@@ -159,12 +175,8 @@ def forgot_password(req: ForgotPasswordRequest):
         new_hash.decode("utf-8") if isinstance(new_hash, bytes) else new_hash,
     )
     
-    # Simulate sending email
-    print("="*40)
-    print(f"[SIMULATED EMAIL TO {req.email}]")
-    print(f"Subject: Đặt lại mật khẩu")
-    print(f"Mật khẩu mới của bạn là: {new_password}")
-    print(f"Vui lòng đăng nhập và đổi lại mật khẩu ngay lập tức.")
-    print("="*40)
+    # Gửi email qua background task
+    from src.services.email import send_password_reset_email
+    background_tasks.add_task(send_password_reset_email, req.email, new_password)
     
     return {"message": "Nếu email hợp lệ, mật khẩu mới sẽ được gửi đến hộp thư của bạn."}
