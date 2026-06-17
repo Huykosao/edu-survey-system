@@ -164,7 +164,8 @@ def forgot_password(req: ForgotPasswordRequest, request: Request, background_tas
         secrets.choice(special)
     ]
     pwd_list += [secrets.choice(all_chars) for _ in range(8)]
-    secrets.SystemRandom().shuffle(pwd_list)
+    import random
+    random.SystemRandom().shuffle(pwd_list)
     new_password = "".join(pwd_list)
     
     # Save the new password
