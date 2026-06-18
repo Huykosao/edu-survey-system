@@ -101,7 +101,6 @@ function EditUserForm() {
       }, 1500);
     } catch (err) {
       console.error("Error saving user:", err);
-    } finally {
       setIsSaving(false);
     }
   };
@@ -123,7 +122,6 @@ function EditUserForm() {
       }, 1500);
     } catch (err) {
       console.error("Error deleting user:", err);
-    } finally {
       setIsDeleting(false);
     }
   };
