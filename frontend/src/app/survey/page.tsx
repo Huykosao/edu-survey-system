@@ -1,310 +1,707 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/context/AuthContext";
+import {
+  surveysApi,
+  responsesApi,
+  improvementsApi,
+  clarificationsApi,
+} from "@/lib/api";
+import type { SurveyContent, SurveyAnswers } from "@/lib/question-types";
+import {
+  getAllQuestions,
+  calcProgress,
+  collectOpenEndedText,
+} from "@/lib/question-types";
+import QuestionRenderer from "@/components/QuestionRenderer";
 
-export default function SurveyPage() {
+// ── Types ──────────────────────────────────────────────────────────────────────
+
+interface Survey {
+  id: number;
+  title: string;
+  description: string;
+  is_anonymous: boolean;
+  target_config: Record<string, unknown>;
+  /**
+   * Cấu trúc câu hỏi chuẩn hoá — 5 dạng.
+   * Survey cũ trong DB có thể có content: {} (không có sections)
+   * → dùng optional chaining ?.sections khi truy cập.
+   */
+  content: Partial<SurveyContent> & Record<string, unknown>;
+}
+
+interface Improvement {
+  id: number;
+  title: string;
+  content: string;
+  created_at: string;
+  surveys?: {
+    title: string;
+  };
+}
+
+// ── Page Component ─────────────────────────────────────────────────────────────
+
+
+export default function SurveyRespondentPage() {
   const router = useRouter();
-  const [answers, setAnswers] = useState<{
-    q1: string;
-    q2: string;
-    mat1: string;
-    mat2: string;
-    mat3: string;
-    nps: string;
-    feedback: string;
-  }>({
-    q1: "Bình thường",
-    q2: "4",
-    mat1: "Cải thiện ít",
-    mat2: "Cải thiện nhiều",
-    mat3: "Cải thiện ít",
-    nps: "8",
-    feedback: "",
-  });
+  const { user, isAuthenticated, isLoading, logout } = useAuth();
 
-  const [progress, setProgress] = useState(40);
+  const [view, setView] = useState<"list" | "taking">("list");
+  const [activeTab, setActiveTab] = useState<"todo" | "done" | "improvements">(
+    "todo",
+  );
+
+  const [surveys, setSurveys] = useState<Survey[]>([]);
+  const [completedSurveys, setCompletedSurveys] = useState<Survey[]>([]);
+  const [improvements, setImprovements] = useState<Improvement[]>([]);
+  const [studentFeedbacks, setStudentFeedbacks] = useState<any[]>([]);
+
+  const [selectedSurvey, setSelectedSurvey] = useState<Survey | null>(null);
+  const [answers, setAnswers] = useState<SurveyAnswers>({});
+  const [progress, setProgress] = useState(0);
   const [showSuccess, setShowSuccess] = useState(false);
-  const [isSaved, setIsSaved] = useState(true);
+  const [loadingData, setLoadingData] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [dashboardError, setDashboardError] = useState<string | null>(null);
 
-  // Recalculate progress based on answered questions
+  // Protect route
   useEffect(() => {
-    let answeredCount = 0;
-    if (answers.q1) answeredCount++;
-    if (answers.q2) answeredCount++;
-    if (answers.mat1 && answers.mat2 && answers.mat3) answeredCount++;
-    if (answers.nps) answeredCount++;
-    if (answers.feedback.trim().length > 0) answeredCount++;
+    if (!isLoading && !isAuthenticated) {
+      router.push("/login");
+    }
+  }, [isLoading, isAuthenticated, router]);
 
-    // Calculate percentage based on 5 main questions
-    const percentage = Math.round((answeredCount / 5) * 100);
-    setProgress(percentage);
-  }, [answers]);
+  // Load surveys & improvements
+  const loadDashboardData = useCallback(async () => {
+    if (!user) return;
+    setLoadingData(true);
+    try {
+      let hasError = false;
+      const [activeList, doneList, newsList] = await Promise.all([
+        surveysApi.mySurveys().catch((err) => {
+          console.error("Failed to load active surveys", err);
+          hasError = true;
+          return [];
+        }),
+        surveysApi.myCompletedSurveys().catch((err) => {
+          console.error("Failed to load completed surveys", err);
+          hasError = true;
+          return [];
+        }),
+        improvementsApi.list().catch((err) => {
+          console.error("Failed to load improvements", err);
+          hasError = true;
+          return [];
+        }),
+      ]);
+      setSurveys((activeList as any[]) || []);
+      setCompletedSurveys((doneList as any[]) || []);
+      setImprovements((newsList as any[]) || []);
 
-  const handleChange = (key: string, value: string) => {
-    setAnswers((prev) => ({ ...prev, [key]: value }));
-    setIsSaved(false);
-    // Simulate auto-save
-    setTimeout(() => {
-      setIsSaved(true);
-    }, 800);
+      if (hasError) {
+        setDashboardError("Một số dữ liệu không thể tải được lúc này. Vui lòng thử lại sau.");
+      } else {
+        setDashboardError(null);
+      }
+
+      try {
+        const feedbacksList = await clarificationsApi.getStudentFeedbacks();
+        setStudentFeedbacks(feedbacksList || []);
+      } catch {
+        // feedbacks optional
+      }
+    } catch (err) {
+      console.error("Error loading respondent dashboard:", err);
+    } finally {
+      setLoadingData(false);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (user) loadDashboardData();
+  }, [user, loadDashboardData]);
+
+  // Tính progress mỗi khi answers thay đổi
+  useEffect(() => {
+    if (!selectedSurvey?.content?.sections?.length) {
+      setProgress(0);
+      return;
+    }
+    setProgress(calcProgress(selectedSurvey.content, answers));
+  }, [answers, selectedSurvey]);
+
+  const handleStartSurvey = (survey: Survey) => {
+    setSelectedSurvey(survey);
+    setAnswers({});
+    setSubmitError(null);
+    setView("taking");
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleAnswerChange = (questionId: string, value: any) => {
+    setAnswers((prev) => ({ ...prev, [questionId]: value }));
+  };
+
+  // Validate phía client trước khi submit
+  const validateAnswers = (): string[] => {
+    if (!selectedSurvey?.content?.sections) return [];
+    const errors: string[] = [];
+    const allQs = getAllQuestions(selectedSurvey.content);
+    allQs.forEach((q, idx) => {
+      if (!q.required) return; // Bỏ qua câu không bắt buộc
+      const answer = answers[q.id];
+      const isEmpty =
+        answer === undefined ||
+        answer === null ||
+        answer === "" ||
+        (Array.isArray(answer) && answer.length === 0) ||
+        (typeof answer === "object" && !Array.isArray(answer) && Object.keys(answer as object).length === 0);
+      if (isEmpty) {
+        errors.push(`Câu ${idx + 1}: "${q.label}" là bắt buộc, vui lòng trả lời trước khi nộp.`);
+      }
+    });
+    return errors;
+  };
+
+  const handleSubmitSurvey = async (e: React.FormEvent) => {
     e.preventDefault();
-    setShowSuccess(true);
+    if (!selectedSurvey) return;
+
+    // 1. Validate phía client trước
+    const clientErrors = validateAnswers();
+    if (clientErrors.length > 0) {
+      setSubmitError(clientErrors.join("\n"));
+      // Cuộn lên phần lỗi
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+
+    setSubmitting(true);
+    setSubmitError(null);
+
+    try {
+      const rawText = collectOpenEndedText(selectedSurvey.content, answers);
+      const submitPayload: Record<string, any> = {
+        answers,
+        raw_content_text: rawText,
+      };
+      // Auto-attach lecturer_id and subject_id from survey target_config (set by admin)
+      if (selectedSurvey.target_config?.lecturer_id) {
+        submitPayload.lecturer_id = selectedSurvey.target_config.lecturer_id;
+      }
+      if (selectedSurvey.target_config?.subject_id) {
+        submitPayload.subject_id = selectedSurvey.target_config.subject_id;
+      }
+      await responsesApi.submit(selectedSurvey.id, submitPayload);
+      setShowSuccess(true);
+    } catch (err: any) {
+      // Parse lỗi từ nhiều cấu trúc response khác nhau
+      const errData = err?.response?.data ?? err?.data ?? err;
+      const detail = errData?.detail;
+      if (detail && typeof detail === "object" && Array.isArray(detail.errors)) {
+        setSubmitError((detail.errors as string[]).join("\n"));
+      } else if (detail && typeof detail === "object" && detail.message) {
+        const msgs: string[] = Array.isArray(detail.errors) ? detail.errors : [];
+        setSubmitError(msgs.length > 0 ? msgs.join("\n") : String(detail.message));
+      } else if (typeof detail === "string") {
+        setSubmitError(detail);
+      } else if (typeof err?.message === "string" && err.message) {
+        setSubmitError(err.message);
+      } else {
+        setSubmitError("Có lỗi xảy ra khi gửi khảo sát. Vui lòng thử lại.");
+      }
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } finally {
+      setSubmitting(false);
+    }
   };
+
+  const handleFinishAndReturn = () => {
+    setShowSuccess(false);
+    setView("list");
+    setSelectedSurvey(null);
+    // Reload danh sách từ server để đảm bảo chính xác
+    loadDashboardData();
+  };
+
+  // ── Loading & Auth Guard ───────────────────────────────────────────────────
+
+  if (isLoading || !isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
+          <span className="text-[14px] text-on-surface-variant font-medium">
+            Đang tải...
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Derived ──────────────────────────────────────────────────────────
+  const sections = (selectedSurvey?.content?.sections || []) as any[];
+  const allQuestions = sections.length
+    ? getAllQuestions(selectedSurvey?.content)
+    : [];
+
+  // ── Render ───────────────────────────────────────────────────────────────────
 
   return (
-    <div className="bg-background text-on-surface min-h-screen flex flex-col font-body-md antialiased">
-      {/* Unified Public Header */}
-      <header className="bg-surface sticky top-0 z-10 shadow-sm border-b border-surface-container-highest">
-        <div className="flex items-center justify-between w-full max-w-container-max mx-auto px-lg h-16">
+    <div className="bg-background text-on-surface min-h-screen flex flex-col font-body-md antialiased pb-20">
+      {/* Header */}
+      <header className="bg-surface-container-lowest sticky top-0 z-30 shadow-sm border-b border-outline-variant/40">
+        <div className="flex items-center justify-between w-full max-w-5xl mx-auto px-md h-16">
           <div className="flex items-center gap-sm">
-            <span className="material-symbols-outlined text-primary text-2xl font-bold">assignment</span>
-            <h1 className="font-headline-md text-headline-md text-primary font-bold">
-              Khảo sát chất lượng đào tạo Học kỳ 1
+            <span className="material-symbols-outlined text-primary font-bold" style={{ fontSize: '24px', lineHeight: '1' }}>
+              assignment
+            </span>
+            <h1 className="font-headline-md text-headline-md text-primary font-bold hidden sm:block leading-none">
+              Cổng Khảo sát Độc lập
+            </h1>
+            <h1 className="font-headline-md text-headline-md text-primary font-bold sm:hidden leading-none">
+              Khảo sát
             </h1>
           </div>
-          <div className="flex items-center gap-sm text-on-surface-variant">
-            <span className="material-symbols-outlined text-[18px] text-tertiary">
-              {isSaved ? "cloud_done" : "sync"}
-            </span>
-            <span className="font-label-sm text-label-sm">
-              {isSaved ? "Đã lưu tự động" : "Đang lưu..."}
-            </span>
+          <div className="flex items-center gap-md">
+            <div className="text-right hidden md:block">
+              <p className="text-[13px] font-semibold text-on-surface leading-tight">
+                {user?.full_name}
+              </p>
+              <p className="text-[11px] text-on-surface-variant leading-none">
+                {user?.roles?.[0]}
+              </p>
+            </div>
+            <div className="w-px h-6 bg-outline-variant/40 hidden md:block"></div>
+            <button
+              onClick={() => logout()}
+              className="text-error border border-error/25 hover:bg-error-container/15 px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: '16px', lineHeight: '1' }}>
+                logout
+              </span>
+              <span className="leading-none">Đăng xuất</span>
+            </button>
           </div>
         </div>
       </header>
 
-      {/* Main Container */}
-      <main className="flex-grow w-full max-w-[720px] mx-auto px-md py-lg flex flex-col gap-lg pb-24">
-        {/* Progress Section */}
-        <section className="flex flex-col gap-sm bg-surface-container-lowest p-md rounded-xl border border-outline-variant/30 shadow-sm">
-          <div className="flex justify-between items-end">
-            <span className="font-label-md text-label-md text-on-surface-variant font-medium">Trang 2/5</span>
-            <span className="font-label-md text-label-md text-primary font-semibold">
-              Đã hoàn thành {progress}%
-            </span>
-          </div>
-          <div aria-hidden="true" className="w-full h-[8px] bg-surface-container-high rounded-full overflow-hidden">
-            <div
-              className="h-full bg-primary rounded-full transition-all duration-300"
-              style={{ width: `${progress}%` }}
-            ></div>
-          </div>
-        </section>
+      {/* Main */}
+      <main className="flex-grow w-full max-w-3xl mx-auto px-md py-lg flex flex-col gap-lg">
+        {view === "list" ? (
+          // ── Dashboard View ────────────────────────────────────────────────
+          <div className="space-y-lg animate-in fade-in duration-300">
+            {/* Error Banner */}
+            {dashboardError && (
+              <div className="bg-warning/10 border border-warning/30 text-warning-dark rounded-xl p-md text-sm flex items-start gap-2">
+                <span className="material-symbols-outlined shrink-0" style={{ fontSize: '20px', lineHeight: '1.2' }}>
+                  warning
+                </span>
+                <p>{dashboardError}</p>
+              </div>
+            )}
 
-        {/* Survey Form */}
-        <form onSubmit={handleSubmit} className="flex flex-col gap-lg">
-          {/* Question 1: Single Choice */}
-          <div className="bg-surface rounded-lg border border-outline-variant p-lg shadow-sm hover:shadow-md transition-shadow duration-200 flex flex-col gap-md">
-            <h2 className="font-body-lg text-body-lg font-semibold text-on-surface">
-              1. Mức độ hài lòng của bạn đối với cơ sở vật chất của nhà trường?
-            </h2>
-            <div className="flex flex-col gap-xs mt-sm">
-              {["Rất hài lòng", "Hài lòng", "Bình thường", "Không hài lòng"].map((option) => (
-                <label
-                  key={option}
-                  className="flex items-center gap-md cursor-pointer group p-sm -ml-sm rounded hover:bg-surface-container-low transition-colors"
-                >
-                  <input
-                    type="radio"
-                    name="q1"
-                    checked={answers.q1 === option}
-                    onChange={() => handleChange("q1", option)}
-                    className="w-5 h-5 text-primary border-outline-variant focus:ring-primary cursor-pointer"
-                  />
-                  <span className="font-body-md text-body-md group-hover:text-primary transition-colors">
-                    {option}
-                  </span>
-                </label>
-              ))}
+            {/* Welcome */}
+            <div className="bg-surface-container-lowest border border-outline-variant p-lg rounded-2xl shadow-sm relative overflow-hidden">
+              <div className="absolute -top-12 -right-12 w-48 h-48 bg-primary rounded-full filter blur-[70px] opacity-15"></div>
+              <h2 className="text-headline-lg font-bold text-primary mb-1">
+                Xin chào, {user?.full_name}!
+              </h2>
+              <p className="text-sm text-on-surface-variant leading-relaxed">
+                Ý kiến đóng góp của bạn là kim chỉ nam giúp nhà trường hoàn
+                thiện chất lượng giảng dạy, cơ sở vật chất và trải nghiệm học
+                tập tốt hơn mỗi ngày.
+              </p>
             </div>
-          </div>
 
-          {/* Question 2: Likert Scale */}
-          <div className="bg-surface rounded-lg border border-outline-variant p-lg shadow-sm hover:shadow-md transition-shadow duration-200 flex flex-col gap-md">
-            <h2 className="font-body-lg text-body-lg font-semibold text-on-surface">
-              2. Vui lòng đánh giá mức độ đồng ý của bạn: &quot;Giảng viên cung cấp tài liệu học tập đầy đủ và kịp thời.&quot;
-            </h2>
-            <div className="flex flex-col sm:flex-row justify-between items-center gap-md mt-sm bg-surface-container-lowest p-md rounded-lg border border-surface-container-high">
-              <span className="font-label-sm text-label-sm text-on-surface-variant hidden sm:block text-center leading-tight">
-                Hoàn toàn<br />không đồng ý
-              </span>
-              <div className="flex gap-md w-full sm:w-auto justify-between sm:justify-start px-2">
-                {["1", "2", "3", "4", "5"].map((num) => (
-                  <label key={num} className="flex flex-col items-center gap-sm cursor-pointer group">
-                    <span className="font-label-sm text-label-sm text-on-surface-variant sm:hidden">{num}</span>
-                    <input
-                      type="radio"
-                      name="q2"
-                      value={num}
-                      checked={answers.q2 === num}
-                      onChange={() => handleChange("q2", num)}
-                      className="w-5 h-5 text-primary border-outline-variant focus:ring-primary cursor-pointer"
-                    />
-                    <span className="hidden sm:block font-label-sm text-label-sm text-on-surface-variant group-hover:text-primary mt-1">
-                      {num}
+            {/* Tabs */}
+            <div className="flex border-b border-outline-variant gap-lg">
+              {(["todo", "done", "improvements"] as const).map((tab) => {
+                const labels = {
+                  todo: "Khảo sát chưa làm",
+                  done: "Khảo sát đã hoàn thành",
+                  improvements: "Bảng tin cải tiến",
+                };
+                const icons = {
+                  todo: "assignment",
+                  done: "task_alt",
+                  improvements: "campaign",
+                };
+                return (
+                  <button
+                    key={tab}
+                    onClick={() => setActiveTab(tab)}
+                    className={`border-b-2 py-3 px-1 font-label-md text-label-md font-semibold transition-colors cursor-pointer flex items-center gap-1.5 ${
+                      activeTab === tab
+                        ? "border-primary text-primary"
+                        : "border-transparent text-on-surface-variant hover:text-on-surface"
+                    }`}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: '18px', lineHeight: '1' }}>
+                      {icons[tab]}
                     </span>
-                  </label>
-                ))}
+                    <span className="leading-none">{labels[tab]}</span>
+                    {tab === "todo" && surveys.length > 0 && (
+                      <span className="bg-primary text-on-primary text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">
+                        {surveys.length}
+                      </span>
+                    )}
+                    {tab === "done" && completedSurveys.length > 0 && (
+                      <span className="bg-secondary text-on-secondary text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">
+                        {completedSurveys.length}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Tab Content */}
+            {loadingData ? (
+              <div className="py-xl text-center flex flex-col items-center gap-md">
+                <span className="material-symbols-outlined text-primary animate-spin" style={{ fontSize: '36px', lineHeight: '1' }}>
+                  sync
+                </span>
+                <span className="text-body-md text-on-surface-variant leading-none">
+                  Đang tải...
+                </span>
               </div>
-              <span className="font-label-sm text-label-sm text-on-surface-variant text-right hidden sm:block text-center leading-tight">
-                Hoàn toàn<br />đồng ý
-              </span>
-            </div>
-          </div>
-
-          {/* Question 3: Matrix */}
-          <div className="bg-surface rounded-lg border border-outline-variant p-lg shadow-sm hover:shadow-md transition-shadow duration-200 flex flex-col gap-md overflow-hidden">
-            <h2 className="font-body-lg text-body-lg font-semibold text-on-surface">
-              3. Đánh giá mức độ cải thiện các năng lực sau của bạn sau khi hoàn thành học kỳ:
-            </h2>
-            <div className="overflow-x-auto mt-sm">
-              <table className="w-full text-left border-collapse min-w-[500px]">
-                <thead>
-                  <tr className="border-b border-surface-container-high">
-                    <th className="p-sm font-label-md text-label-md text-on-surface-variant font-semibold w-1/3">Năng lực</th>
-                    <th className="p-sm font-label-md text-label-md text-on-surface-variant font-semibold text-center">Không cải thiện</th>
-                    <th className="p-sm font-label-md text-label-md text-on-surface-variant font-semibold text-center">Cải thiện ít</th>
-                    <th className="p-sm font-label-md text-label-md text-on-surface-variant font-semibold text-center">Cải thiện nhiều</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {[
-                    { key: "mat1", label: "Tư duy phản biện" },
-                    { key: "mat2", label: "Lập trình & Kỹ thuật" },
-                    { key: "mat3", label: "Giải quyết vấn đề" },
-                  ].map((row) => (
-                    <tr key={row.key} className="border-b border-outline-variant/30 hover:bg-surface-container-low transition-colors">
-                      <td className="p-sm font-body-md text-body-md py-md font-medium">{row.label}</td>
-                      {["Không cải thiện", "Cải thiện ít", "Cải thiện nhiều"].map((col) => (
-                        <td key={col} className="p-sm text-center">
-                          <input
-                            type="radio"
-                            name={row.key}
-                            checked={answers[row.key as keyof typeof answers] === col}
-                            onChange={() => handleChange(row.key, col)}
-                            className="w-5 h-5 text-primary border-outline-variant focus:ring-primary cursor-pointer"
-                          />
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* Question 4: NPS Scale */}
-          <div className="bg-surface rounded-lg border border-outline-variant p-lg shadow-sm hover:shadow-md transition-shadow duration-200 flex flex-col gap-md">
-            <h2 className="font-body-lg text-body-lg font-semibold text-on-surface">
-              4. Khả năng bạn sẽ giới thiệu chương trình đào tạo này cho bạn bè hoặc người thân?
-            </h2>
-            <div className="flex flex-col mt-sm gap-md">
-              <div className="flex flex-wrap justify-between gap-xs sm:gap-sm bg-surface-container-lowest p-md rounded-lg border border-surface-container-high">
-                {Array.from({ length: 11 }).map((_, i) => {
-                  const numStr = i.toString();
-                  return (
-                    <label key={i} className="flex-1 flex justify-center cursor-pointer relative group min-w-[32px]">
-                      <input
-                        type="radio"
-                        name="nps"
-                        value={numStr}
-                        checked={answers.nps === numStr}
-                        onChange={() => handleChange("nps", numStr)}
-                        className="peer sr-only"
-                      />
-                      <div className="w-10 h-10 flex items-center justify-center rounded border border-outline-variant font-label-md text-label-md peer-checked:bg-primary peer-checked:text-on-primary peer-checked:border-primary hover:bg-surface-container-low transition-colors">
-                        {i}
+            ) : activeTab === "todo" ? (
+              <div className="space-y-md">
+                {surveys.length === 0 ? (
+                  <div className="py-xl text-center text-on-surface-variant font-body-md bg-surface-container-lowest rounded-xl border border-outline-variant p-lg shadow-inner flex flex-col items-center gap-sm">
+                    <span className="material-symbols-outlined text-outline" style={{ fontSize: '48px', lineHeight: '1' }}>
+                      assignment_turned_in
+                    </span>
+                    <span>Bạn đã hoàn thành tất cả khảo sát kỳ này! Cảm ơn bạn.</span>
+                  </div>
+                ) : (
+                  surveys.map((s) => (
+                    <div
+                      key={s.id}
+                      className="bg-surface-container-lowest border border-outline-variant rounded-xl p-lg shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-md hover:border-primary/20 transition-all duration-150"
+                    >
+                      <div>
+                        <h4 className="font-label-md text-label-md text-on-surface text-base font-bold mb-xs">
+                          {s.title}
+                        </h4>
+                        <p className="text-xs text-on-surface-variant leading-relaxed line-clamp-2">
+                          {s.description ||
+                            "Bấm nút bên phải để bắt đầu làm khảo sát."}
+                        </p>
+                        {/* Hiển thị số câu hỏi nếu có content */}
+                        {s.content?.sections && (
+                          <p className="text-[10px] text-primary font-semibold mt-1">
+                            {getAllQuestions(s.content).length} câu hỏi ·{" "}
+                            {s.content.sections.length} phần
+                          </p>
+                        )}
                       </div>
-                    </label>
-                  );
-                })}
+                      <button
+                        onClick={() => handleStartSurvey(s)}
+                        className="bg-primary text-on-primary px-5 py-2.5 rounded-lg text-xs font-bold hover:bg-primary-container hover:text-on-primary-container transition-colors shadow-sm cursor-pointer shrink-0 self-start sm:self-auto"
+                      >
+                        Bắt đầu làm bài
+                      </button>
+                    </div>
+                  ))
+                )}
               </div>
-              <div className="flex justify-between px-xs">
-                <span className="font-label-sm text-label-sm text-on-surface-variant">Không bao giờ</span>
-                <span className="font-label-sm text-label-sm text-on-surface-variant">Chắc chắn</span>
+            ) : activeTab === "done" ? (
+              <div className="space-y-md">
+                {completedSurveys.length === 0 ? (
+                  <div className="py-xl text-center text-on-surface-variant font-body-md bg-surface-container-lowest rounded-xl border border-outline-variant p-lg flex flex-col items-center gap-sm">
+                    <span className="material-symbols-outlined text-outline" style={{ fontSize: '36px', lineHeight: '1' }}>
+                      history
+                    </span>
+                    <span>Chưa có khảo sát nào được hoàn thành.</span>
+                  </div>
+                ) : (
+                  completedSurveys.map((s) => (
+                    <div
+                      key={s.id}
+                      className="bg-surface-container-lowest border border-outline-variant/60 opacity-80 rounded-xl p-lg shadow-sm flex items-center justify-between gap-md"
+                    >
+                      <div>
+                        <h4 className="font-label-md text-label-md text-on-surface text-base font-bold mb-xs">
+                          {s.title}
+                        </h4>
+                        <p className="text-xs text-on-surface-variant leading-relaxed">
+                          {s.description}
+                        </p>
+                      </div>
+                      <span className="text-emerald-700 font-bold text-xs flex items-center gap-1 shrink-0 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-100">
+                        <span className="material-symbols-outlined font-bold" style={{ fontSize: '16px', lineHeight: '1' }}>
+                          verified
+                        </span>
+                        <span className="leading-none">Đã nộp bài</span>
+                      </span>
+                    </div>
+                  ))
+                )}
               </div>
-            </div>
-          </div>
+            ) : (
+              // Improvements & Feedbacks
+              <div className="space-y-lg">
+                <div className="space-y-md">
+                  <h3 className="font-label-md text-label-md font-bold text-primary uppercase tracking-wider flex items-center gap-1.5">
+                    <span className="material-symbols-outlined" style={{ fontSize: '20px', lineHeight: '1' }}>
+                      campaign
+                    </span>
+                    <span className="leading-none">Thông báo Cải tiến từ Nhà trường</span>
+                  </h3>
+                  {improvements.length === 0 ? (
+                    <div className="py-lg text-center text-on-surface-variant text-sm bg-surface-container rounded-xl p-md">
+                      Chưa có thông báo cải tiến chung nào.
+                    </div>
+                  ) : (
+                    improvements.map((item) => (
+                      <div
+                        key={item.id}
+                        className="bg-surface-container-lowest border border-outline-variant rounded-xl p-lg shadow-sm space-y-sm"
+                      >
+                        <div className="flex justify-between items-center">
+                          <span className="text-[10px] font-bold text-secondary bg-secondary/8 px-2.5 py-0.5 rounded-full">
+                            Cải tiến chất lượng
+                          </span>
+                          <span className="text-xs text-on-surface-variant font-medium">
+                            {new Date(item.created_at).toLocaleDateString(
+                              "vi-VN",
+                            )}
+                          </span>
+                        </div>
+                        <h4 className="font-label-md text-label-md text-on-surface text-base font-bold">
+                          {item.title}
+                        </h4>
+                        {item.surveys?.title && (
+                          <div className="text-xs text-primary font-semibold flex items-center gap-1.5 mt-0.5">
+                            <span className="material-symbols-outlined text-[15px]" style={{ lineHeight: '1' }}>assignment</span>
+                            <span className="leading-none">Khảo sát: {item.surveys.title}</span>
+                          </div>
+                        )}
+                        <p className="font-body-md text-sm text-on-surface-variant leading-relaxed">
+                          {item.content}
+                        </p>
+                      </div>
+                    ))
+                  )}
+                </div>
 
-          {/* Question 5: Text Area */}
-          <div className="bg-surface rounded-lg border border-outline-variant p-lg shadow-sm hover:shadow-md transition-shadow duration-200 flex flex-col gap-md">
-            <h2 className="font-body-lg text-body-lg font-semibold text-on-surface">
-              5. Bạn có ý kiến đóng góp gì thêm để cải thiện chất lượng đào tạo không?
-            </h2>
-            <div className="mt-sm flex flex-col gap-xs">
-              <label className="sr-only" htmlFor="feedback">Ý kiến đóng góp</label>
-              <textarea
-                id="feedback"
-                name="feedback"
-                value={answers.feedback}
-                onChange={(e) => handleChange("feedback", e.target.value)}
-                placeholder="Nhập ý kiến của bạn tại đây..."
-                rows={4}
-                className="w-full min-h-[120px] p-md rounded-md border border-outline-variant font-body-md text-body-md text-on-surface placeholder:text-outline focus:border-primary focus:border-[2px] focus:ring-0 focus:outline-none transition-all resize-y"
-              ></textarea>
-            </div>
-          </div>
+                <div className="space-y-md border-t border-outline-variant/30 pt-lg mt-lg">
+                  <h3 className="font-label-md text-label-md font-bold text-secondary uppercase tracking-wider flex items-center gap-1.5">
+                    <span className="material-symbols-outlined" style={{ fontSize: '20px', lineHeight: '1' }}>
+                      chat_bubble
+                    </span>
+                    <span className="leading-none">Phản hồi &amp; Cam kết của Giảng viên</span>
+                  </h3>
+                  {studentFeedbacks.length === 0 ? (
+                    <div className="py-lg text-center text-on-surface-variant text-sm bg-surface-container rounded-xl p-md">
+                      Chưa có thư phản hồi nào từ giảng viên được đăng tải.
+                    </div>
+                  ) : (
+                    studentFeedbacks.map((fb) => (
+                      <div
+                        key={fb.id}
+                        className="bg-surface-container-lowest border border-outline-variant rounded-xl p-lg shadow-sm space-y-sm"
+                      >
+                        <div className="flex justify-between items-start gap-md border-b border-outline-variant/30 pb-xs">
+                          <div>
+                            <h4 className="font-label-md text-label-md text-on-surface font-bold text-base">
+                              {fb.survey_clarifications?.users?.full_name ||
+                                "Giảng viên bộ môn"}
+                            </h4>
+                            <p className="text-xs text-primary font-semibold mt-0.5">
+                              Khảo sát:{" "}
+                              {fb.survey_clarifications?.surveys?.title ||
+                                "Khảo sát học phần"}
+                            </p>
+                          </div>
+                          <span className="text-xs text-on-surface-variant font-medium shrink-0">
+                            {new Date(fb.created_at).toLocaleDateString(
+                              "vi-VN",
+                            )}
+                          </span>
+                        </div>
+                        <div className="pt-xs">
+                          <p className="text-xs text-on-surface-variant font-bold mb-1">
+                            Thư phản hồi gửi lớp:
+                          </p>
+                          <div className="p-md bg-surface rounded-lg border border-outline-variant/40 italic text-sm text-on-surface leading-relaxed">
+                            &quot;{fb.message_content}&quot;
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
 
-          {/* Sticky Action Footer */}
-          <div className="fixed bottom-0 left-0 right-0 bg-surface border-t border-surface-container-highest py-md shadow-lg z-20">
-            <div className="w-full max-w-[720px] mx-auto px-md flex justify-between items-center gap-md">
-              <button
-                type="button"
-                onClick={() => router.push("/login")}
-                className="min-h-[48px] px-lg rounded font-label-md text-label-md font-semibold text-primary border border-primary hover:bg-surface-container-low focus:ring-2 focus:ring-primary focus:ring-offset-2 transition-colors cursor-pointer"
-              >
-                Quay lại Đăng nhập
-              </button>
-              <button
-                type="submit"
-                className="min-h-[48px] px-lg rounded font-label-md text-label-md font-semibold text-on-primary bg-primary hover:bg-primary-container hover:text-on-primary-container focus:ring-2 focus:ring-primary focus:ring-offset-2 transition-colors shadow-sm cursor-pointer"
-              >
-                Gửi kết quả
-              </button>
-            </div>
+            )}
           </div>
-        </form>
+        ) : (
+          // ── Taking Survey View ──────────────────────────────────────────────
+          <div className="space-y-lg animate-in fade-in duration-300">
+            {/* Progress Bar */}
+            <section className="flex flex-col gap-sm bg-surface-container-lowest p-md rounded-xl border border-outline-variant/30 shadow-sm">
+              <div className="flex justify-between items-end">
+                <span className="font-label-md text-label-md text-on-surface-variant font-bold">
+                  {selectedSurvey?.title}
+                </span>
+                <span className="font-label-md text-label-md text-primary font-semibold">
+                  Tiến độ: {progress}%
+                </span>
+              </div>
+              <div className="w-full h-[6px] bg-surface-container-high rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-primary rounded-full transition-all duration-300"
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
+              <p className="text-[11px] text-on-surface-variant">
+                {allQuestions.filter((q) => q.required).length} câu hỏi bắt buộc
+                {allQuestions.filter((q) => !q.required).length > 0 &&
+                  ` · ${allQuestions.filter((q) => !q.required).length} câu hỏi tùy chọn`}
+              </p>
+            </section>
+
+            {/* Error */}
+            {submitError && (
+              <div className="bg-error/8 border border-error/30 text-error rounded-xl p-md text-sm">
+                <div className="flex items-start gap-2">
+                  <span className="material-symbols-outlined shrink-0 mt-0.5" style={{ fontSize: '18px', lineHeight: '1' }}>
+                    error
+                  </span>
+                  <div className="flex-1">
+                    <p className="font-bold mb-1">Vui lòng kiểm tra lại trước khi nộp:</p>
+                    <ul className="list-none space-y-0.5">
+                      {submitError.split("\n").map((line, i) => (
+                        <li key={i} className="flex items-start gap-1">
+                          <span className="shrink-0 mt-1">•</span>
+                          <span>{line}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Survey Form */}
+            <form onSubmit={handleSubmitSurvey} className="space-y-lg">
+              {/* Render sections & questions */}
+              {sections.length ? (
+                sections.map((section) => (
+                  <div key={section.id} className="space-y-md">
+                    {/* Section Header */}
+                    {(sections.length > 1 ||
+                      section.title) && (
+                      <div className="border-b border-outline-variant/30 pb-sm">
+                        <h2 className="font-headline-sm text-headline-sm font-bold text-on-surface">
+                          {section.title}
+                        </h2>
+                        {section.description && (
+                          <p className="text-sm text-on-surface-variant mt-0.5">
+                            {section.description}
+                          </p>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Questions */}
+                    {section.questions.map((question: any, idx: number) => {
+                      // Tính index toàn cục
+                      const globalIdx =
+                        sections
+                          .slice(
+                            0,
+                            sections.indexOf(section),
+                          )
+                          .reduce((acc, s) => acc + s.questions.length, 0) +
+                        idx;
+
+                      return (
+                        <QuestionRenderer
+                          key={question.id}
+                          question={question}
+                          answers={answers}
+                          onChange={handleAnswerChange}
+                          index={globalIdx}
+                        />
+                      );
+                    })}
+                  </div>
+                ))
+              ) : (
+                /* Fallback nếu survey chưa có content */
+                <div className="py-xl text-center text-on-surface-variant bg-surface-container-lowest rounded-xl border border-outline-variant p-lg flex flex-col items-center gap-sm">
+                  <span className="material-symbols-outlined text-outline" style={{ fontSize: '36px', lineHeight: '1' }}>
+                    warning
+                  </span>
+                  <p className="font-semibold">Khảo sát này chưa có câu hỏi.</p>
+                  <p className="text-sm mt-1">
+                    Vui lòng liên hệ quản lý để cập nhật nội dung khảo sát.
+                  </p>
+                </div>
+              )}
+
+              {/* Actions */}
+              <div className="flex gap-sm justify-end pt-md">
+                <button
+                  type="button"
+                  onClick={() => setView("list")}
+                  className="px-lg py-2.5 border border-outline-variant rounded-lg text-label-md font-label-md text-on-surface hover:bg-surface-container-low transition-colors cursor-pointer"
+                >
+                  Hủy bỏ &amp; Quay lại
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="px-lg py-2.5 bg-primary text-on-primary rounded-lg text-label-md font-label-md hover:bg-primary-container transition-colors shadow-sm cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                  {submitting && (
+                    <span className="w-4 h-4 border-2 border-on-primary/30 border-t-on-primary rounded-full animate-spin" />
+                  )}
+                  {submitting ? "Đang gửi..." : "Gửi khảo sát"}
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
       </main>
 
       {/* Success Modal */}
       {showSuccess && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-md">
-          <div className="fixed inset-0 bg-black/55 backdrop-blur-sm" onClick={() => setShowSuccess(false)}></div>
+          <div
+            className="fixed inset-0 bg-black/55 backdrop-blur-sm"
+            onClick={handleFinishAndReturn}
+          ></div>
           <div className="relative bg-surface rounded-xl border border-outline-variant/30 shadow-2xl p-xl max-w-[480px] w-full flex flex-col gap-md text-center items-center z-10 animate-in fade-in zoom-in-95 duration-200">
-            <div className="w-16 h-16 bg-tertiary-container text-on-tertiary-container rounded-full flex items-center justify-center shadow-inner mb-sm">
-              <span className="material-symbols-outlined text-4xl font-bold">check_circle</span>
+            <div className="w-16 h-16 bg-emerald-100 text-emerald-800 rounded-full flex items-center justify-center shadow-inner mb-sm">
+              <span className="material-symbols-outlined font-bold" style={{ fontSize: '36px', lineHeight: '1' }}>
+                check_circle
+              </span>
             </div>
-            <h3 className="font-headline-lg text-headline-lg text-primary font-bold">Gửi khảo sát thành công!</h3>
+            <h3 className="font-headline-lg text-headline-lg text-primary font-bold">
+              Gửi khảo sát thành công!
+            </h3>
             <p className="font-body-md text-body-md text-on-surface-variant leading-relaxed">
-              Cảm ơn bạn đã đóng góp ý kiến phản hồi quý báu của mình. Thông tin này sẽ giúp nhà trường cải tiến chất lượng dạy và học trong học kỳ tới.
+              Cảm ơn bạn đã đóng góp ý kiến phản hồi quý báu. Ý kiến này sẽ giúp
+              nhà trường nâng cao chất lượng giáo dục trong học kỳ tới!
             </p>
-            <div className="flex gap-sm w-full mt-lg">
-              <button
-                onClick={() => {
-                  setShowSuccess(false);
-                  router.push("/login");
-                }}
-                className="flex-1 min-h-[48px] bg-primary text-on-primary hover:bg-primary-container hover:text-on-primary-container font-label-md text-label-md rounded-lg transition-colors shadow-sm cursor-pointer"
-              >
-                Về trang chủ đăng nhập
-              </button>
-            </div>
+            <button
+              onClick={handleFinishAndReturn}
+              className="w-full min-h-[48px] bg-primary text-on-primary hover:bg-primary-container font-label-md text-label-md rounded-lg transition-colors shadow-sm cursor-pointer mt-md"
+            >
+              Quay lại Danh sách
+            </button>
           </div>
         </div>
       )}
-
-      {/* Simple Unified Footer */}
-      <footer className="bg-surface-container-low border-t border-outline-variant py-md mt-auto mb-20">
-        <div className="w-full max-w-container-max mx-auto px-lg text-center">
-          <p className="font-label-sm text-label-sm text-on-surface-variant">
-            Ban Khảo sát và Đánh giá Giáo dục. Dữ liệu được mã hóa bảo mật.
-          </p>
-        </div>
-      </footer>
     </div>
   );
 }

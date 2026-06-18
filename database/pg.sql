@@ -195,7 +195,7 @@ CREATE TABLE public.lecturer_responses_to_students (
 -- Manager đăng thông báo về những gì trường đã cải thiện sau khảo sát
 CREATE TABLE public.improvement_announcements (
     id SERIAL PRIMARY KEY,
-    survey_id INT REFERENCES public.surveys(id),
+    survey_id INT REFERENCES public.surveys(id) ON DELETE CASCADE,
     title VARCHAR(255),
     content TEXT,
     target_roles JSONB, -- [STUDENT, ALUMNI, EMPLOYER]
@@ -215,6 +215,80 @@ CREATE TABLE public.notifications (
     is_read BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMPTZ DEFAULT now()
 );
+
+-- 1. Tạo bảng lưu trữ danh sách tên miền email được phép
+CREATE TABLE public.allowed_domains (
+    id SERIAL PRIMARY KEY,
+    domain VARCHAR(255) UNIQUE NOT NULL,
+    description TEXT,
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- 2. Chèn dữ liệu mẫu
+INSERT INTO public.allowed_domains (domain, description) VALUES
+('example.com', 'Tên miền thử nghiệm'),
+('mycompany.com', 'Tên miền công ty'),
+('edu.vn', 'Tên miền giáo dục chung'),
+('student.edu.vn', 'Tên miền sinh viên');
+
+CREATE TABLE public.survey_label_definitions (
+    id SERIAL PRIMARY KEY,
+    role_id INT NOT NULL REFERENCES public.roles(id) ON DELETE CASCADE,
+    label_name VARCHAR(255) NOT NULL,
+    label_description TEXT,
+    created_at TIMESTAMPTZ DEFAULT now(),
+    
+    -- Một Role không được có 2 nhãn trùng tên
+    UNIQUE(role_id, label_name)
+);
+
+CREATE INDEX idx_label_role_id ON public.survey_label_definitions(role_id);
+
+CREATE TABLE public.response_labels (
+    id BIGSERIAL PRIMARY KEY,
+
+    response_id INT NOT NULL
+        REFERENCES public.survey_responses(id)
+        ON DELETE CASCADE,
+
+    label_id INT NOT NULL,
+
+    sentiment VARCHAR(20) NOT NULL
+        CHECK(sentiment IN ('positive','negative')),
+
+    confidence NUMERIC(5,4),
+
+    created_at TIMESTAMPTZ DEFAULT now(),
+    feedback_text text,
+    question_id varchar(50);
+);
+
+CREATE INDEX idx_response_labels_response
+ON public.response_labels(response_id);
+
+CREATE INDEX idx_response_labels_label
+ON public.response_labels(label_id);
+
+CREATE TABLE public.ai_label_summaries (
+    id BIGSERIAL PRIMARY KEY,
+
+    survey_id INT NOT NULL
+        REFERENCES public.surveys(id)
+        ON DELETE CASCADE,
+
+    label_id INT NOT NULL,
+
+    sentiment VARCHAR(20) NOT NULL,
+
+    total_count INT DEFAULT 0,
+
+    summary TEXT,
+
+    representative_comments JSONB DEFAULT '[]',
+
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+
 
 -- ==========================================
 -- 10. CHỈ MỤC TỐI ƯU (INDEXES)

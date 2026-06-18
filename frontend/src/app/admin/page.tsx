@@ -1,238 +1,328 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { useAuth } from "@/context/AuthContext";
+import { dashboardApi } from "@/lib/api";
 
 export default function AdminDashboardPage() {
-  const [selectedDept, setSelectedDept] = useState("Tất cả khoa");
-  const [selectedMajor, setSelectedMajor] = useState("Tất cả ngành");
-  const [selectedSemester, setSelectedSemester] = useState("Học kỳ 1 - 2023/2024");
+  const { user } = useAuth();
+  const roles = user?.roles || [];
+  const primaryRole = roles[0] || "MANAGER";
 
-  return (
-    <div className="flex flex-col gap-lg animate-in fade-in duration-300">
-      {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-md border-b border-outline-variant/30 pb-md">
-        <div>
-          <h2 className="font-headline-lg text-headline-lg text-primary font-bold">Báo cáo Tổng hợp</h2>
-          <p className="font-body-md text-body-md text-on-surface-variant mt-xs">
-            Phân tích dữ liệu khảo sát và chất lượng giảng dạy của học sinh & giảng viên
+  const [stats, setStats] = useState({
+    total_users: 0,
+    total_surveys: 0,
+    total_responses: 0,
+    pending_clarifications: 0,
+    avg_rating: 0,
+  });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // Fetch real stats overview
+    dashboardApi
+      .overview()
+      .then((data: any) => {
+        setStats({
+          total_users: data.total_users || 0,
+          total_surveys: data.total_surveys || 0,
+          total_responses: data.total_responses || 0,
+          pending_clarifications: data.pending_clarifications || 0,
+          avg_rating: data.avg_rating || 0,
+        });
+      })
+      .catch((err) => console.error("Error fetching overview stats:", err))
+      .finally(() => setLoading(false));
+  }, []);
+
+  // =============================================================
+  // 1. ADMIN DASHBOARD VIEW
+  // =============================================================
+  const renderAdminDashboard = () => {
+    return (
+      <div className="flex flex-col gap-lg animate-in fade-in duration-300">
+        <div className="flex flex-col gap-sm border-b border-outline-variant/30 pb-md">
+          <h2 className="font-headline-lg text-headline-lg text-primary font-bold">Tổng quan Hệ thống</h2>
+          <p className="font-body-md text-body-md text-on-surface-variant">
+            Theo dõi trạng thái vận hành của máy chủ, số lượng tài khoản và phân quyền hệ thống.
           </p>
         </div>
-        <div className="flex items-center gap-sm">
-          <button className="flex items-center gap-sm px-md py-sm rounded-lg border border-outline bg-surface text-primary font-label-md text-label-md hover:bg-surface-container-low transition-colors cursor-pointer">
-            <span className="material-symbols-outlined text-lg">download</span>
-            Xuất PDF
-          </button>
-          <button className="flex items-center gap-sm px-md py-sm rounded-lg border border-outline bg-surface text-primary font-label-md text-label-md hover:bg-surface-container-low transition-colors cursor-pointer">
-            <span className="material-symbols-outlined text-lg">table_view</span>
-            Xuất Excel
-          </button>
-        </div>
-      </div>
 
-      {/* Advanced Filters Bento Box */}
-      <div className="bg-surface rounded-xl border border-outline-variant p-lg shadow-sm">
-        <div className="flex items-center gap-sm mb-md text-primary">
-          <span className="material-symbols-outlined">filter_alt</span>
-          <h3 className="font-label-md text-label-md font-bold uppercase tracking-wider">
-            Bộ lọc nâng cao
-          </h3>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-lg">
-          <div className="flex flex-col gap-xs">
-            <label className="font-label-sm text-label-sm text-on-surface font-semibold">Khoa</label>
-            <select
-              value={selectedDept}
-              onChange={(e) => setSelectedDept(e.target.value)}
-              className="w-full rounded-lg border border-outline-variant bg-surface-container-lowest p-sm font-body-md text-body-md focus:border-primary focus:ring-1 focus:ring-primary outline-none"
-            >
-              <option>Tất cả khoa</option>
-              <option>Công nghệ thông tin</option>
-              <option>Kinh tế</option>
-              <option>Ngoại ngữ</option>
-            </select>
+        {/* Stats Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-lg">
+          <div className="bg-surface rounded-xl border border-outline-variant p-lg shadow-sm flex items-center justify-between">
+            <div>
+              <p className="font-label-md text-label-md text-on-surface-variant mb-xs">Tổng người dùng</p>
+              <h4 className="font-display-lg text-[36px] text-primary font-bold">{loading ? "..." : stats.total_users}</h4>
+              <span className="text-[12px] text-tertiary flex items-center gap-1 mt-1 font-semibold">
+                Tài khoản đang hoạt động
+              </span>
+            </div>
+            <div className="w-14 h-14 rounded-xl bg-primary/8 text-primary flex items-center justify-center">
+              <span className="material-symbols-outlined text-[28px] icon-fill">groups</span>
+            </div>
           </div>
-          <div className="flex flex-col gap-xs">
-            <label className="font-label-sm text-label-sm text-on-surface font-semibold">Ngành</label>
-            <select
-              value={selectedMajor}
-              onChange={(e) => setSelectedMajor(e.target.value)}
-              className="w-full rounded-lg border border-outline-variant bg-surface-container-lowest p-sm font-body-md text-body-md focus:border-primary focus:ring-1 focus:ring-primary outline-none"
-            >
-              <option>Tất cả ngành</option>
-              <option>Kỹ thuật phần mềm</option>
-              <option>Hệ thống thông tin</option>
-              <option>Quản trị kinh doanh</option>
-            </select>
-          </div>
-          <div className="flex flex-col gap-xs">
-            <label className="font-label-sm text-label-sm text-on-surface font-semibold">Học kỳ</label>
-            <select
-              value={selectedSemester}
-              onChange={(e) => setSelectedSemester(e.target.value)}
-              className="w-full rounded-lg border border-outline-variant bg-surface-container-lowest p-sm font-body-md text-body-md focus:border-primary focus:ring-1 focus:ring-primary outline-none"
-            >
-              <option>Học kỳ 1 - 2023/2024</option>
-              <option>Học kỳ 2 - 2023/2024</option>
-              <option>Học kỳ 1 - 2024/2025</option>
-            </select>
-          </div>
-        </div>
-      </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-lg">
-        <div className="bg-surface rounded-xl border border-outline-variant p-lg shadow-sm flex items-center justify-between hover:shadow-md transition-shadow">
-          <div>
-            <p className="font-label-md text-label-md text-on-surface-variant mb-xs">Tổng lượt tham gia</p>
-            <h4 className="font-display-lg text-display-lg text-primary font-bold">12,450</h4>
-            <span className="text-[12px] text-tertiary flex items-center gap-1 mt-1 font-semibold">
-              <span className="material-symbols-outlined text-[14px]">trending_up</span>
-              +12.4% so với học kỳ trước
-            </span>
+          <div className="bg-surface rounded-xl border border-outline-variant p-lg shadow-sm flex items-center justify-between">
+            <div>
+              <p className="font-label-md text-label-md text-on-surface-variant mb-xs">Tổng số Khảo sát</p>
+              <h4 className="font-display-lg text-[36px] text-secondary font-bold">{loading ? "..." : stats.total_surveys}</h4>
+              <span className="text-[12px] text-secondary flex items-center gap-1 mt-1 font-semibold">
+                Được thiết kế bởi Manager
+              </span>
+            </div>
+            <div className="w-14 h-14 rounded-xl bg-secondary/8 text-secondary flex items-center justify-center">
+              <span className="material-symbols-outlined text-[28px] icon-fill">assignment_turned_in</span>
+            </div>
           </div>
-          <div className="w-16 h-16 rounded-full bg-secondary-container flex items-center justify-center text-on-secondary-container shadow-inner">
-            <span className="material-symbols-outlined text-[32px] icon-fill">groups</span>
-          </div>
-        </div>
-        
-        <div className="bg-surface rounded-xl border border-outline-variant p-lg shadow-sm flex items-center justify-between hover:shadow-md transition-shadow">
-          <div>
-            <p className="font-label-md text-label-md text-on-surface-variant mb-xs">Tỷ lệ hoàn thành</p>
-            <h4 className="font-display-lg text-display-lg text-tertiary-container font-bold">94.2%</h4>
-            <span className="text-[12px] text-tertiary flex items-center gap-1 mt-1 font-semibold">
-              <span className="material-symbols-outlined text-[14px]">check</span>
-              Đạt chỉ tiêu đề ra (trên 90%)
-            </span>
-          </div>
-          <div className="w-16 h-16 rounded-full bg-tertiary-fixed flex items-center justify-center text-on-tertiary-fixed shadow-inner">
-            <span className="material-symbols-outlined text-[32px] icon-fill">check_circle</span>
-          </div>
-        </div>
-      </div>
 
-      {/* Charts Area with beautiful inline SVGs */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-lg">
-        {/* Chart 1: Bar Chart */}
-        <div className="bg-surface rounded-xl border border-outline-variant p-lg shadow-sm col-span-1 lg:col-span-2 min-h-[360px] flex flex-col">
-          <div className="flex justify-between items-center mb-md">
-            <h3 className="font-label-md text-label-md font-bold text-on-surface">Phân tích trắc nghiệm (Cột)</h3>
-            <span className="text-label-sm text-outline-variant font-medium">Theo tiêu chí CSVC</span>
-          </div>
-          <div className="flex-1 bg-surface-container-low rounded-lg border border-outline-variant/30 flex flex-col items-center justify-center p-md">
-            {/* SVG Bar Chart Mockup */}
-            <svg viewBox="0 0 500 200" className="w-full h-full max-h-[220px]">
-              <g className="grid-lines" stroke="#e5e7eb" strokeWidth="1">
-                <line x1="40" y1="20" x2="480" y2="20" />
-                <line x1="40" y1="70" x2="480" y2="70" />
-                <line x1="40" y1="120" x2="480" y2="120" />
-                <line x1="40" y1="170" x2="480" y2="170" />
-              </g>
-              <g className="bars">
-                {/* Bar 1: Rất hài lòng */}
-                <rect x="70" y="40" width="50" height="130" rx="4" fill="#00236f" className="hover:opacity-85 transition-opacity" />
-                <text x="95" y="30" textAnchor="middle" fill="#00236f" className="text-[12px] font-bold">65%</text>
-                
-                {/* Bar 2: Hài lòng */}
-                <rect x="180" y="80" width="50" height="90" rx="4" fill="#0058be" className="hover:opacity-85 transition-opacity" />
-                <text x="205" y="70" textAnchor="middle" fill="#0058be" className="text-[12px] font-bold">45%</text>
-
-                {/* Bar 3: Bình thường */}
-                <rect x="290" y="110" width="50" height="60" rx="4" fill="#757682" className="hover:opacity-85 transition-opacity" />
-                <text x="315" y="100" textAnchor="middle" fill="#757682" className="text-[12px] font-bold">30%</text>
-
-                {/* Bar 4: Không hài lòng */}
-                <rect x="400" y="140" width="50" height="30" rx="4" fill="#ba1a1a" className="hover:opacity-85 transition-opacity" />
-                <text x="425" y="130" textAnchor="middle" fill="#ba1a1a" className="text-[12px] font-bold">15%</text>
-              </g>
-              <g className="x-axis-labels">
-                <text x="95" y="190" textAnchor="middle" fill="#444651" className="text-[11px] font-semibold">Rất hài lòng</text>
-                <text x="205" y="190" textAnchor="middle" fill="#444651" className="text-[11px] font-semibold">Hài lòng</text>
-                <text x="315" y="190" textAnchor="middle" fill="#444651" className="text-[11px] font-semibold">Bình thường</text>
-                <text x="425" y="190" textAnchor="middle" fill="#444651" className="text-[11px] font-semibold">K. hài lòng</text>
-              </g>
-            </svg>
+          <div className="bg-surface rounded-xl border border-outline-variant p-lg shadow-sm flex items-center justify-between">
+            <div>
+              <p className="font-label-md text-label-md text-on-surface-variant mb-xs">Phản hồi khảo sát</p>
+              <h4 className="font-display-lg text-[36px] text-tertiary font-bold">{loading ? "..." : stats.total_responses}</h4>
+              <span className="text-[12px] text-tertiary flex items-center gap-1 mt-1 font-semibold">
+                Ý kiến đóng góp đã nhận
+              </span>
+            </div>
+            <div className="w-14 h-14 rounded-xl bg-tertiary/8 text-tertiary flex items-center justify-center">
+              <span className="material-symbols-outlined text-[28px] icon-fill">forum</span>
+            </div>
           </div>
         </div>
 
-        {/* Chart 2: Radar Chart */}
-        <div className="bg-surface rounded-xl border border-outline-variant p-lg shadow-sm col-span-1 min-h-[360px] flex flex-col">
-          <div className="flex justify-between items-center mb-md">
-            <h3 className="font-label-md text-label-md font-bold text-on-surface">Tiêu chí năng lực (Radar)</h3>
-            <span className="text-label-sm text-outline-variant font-medium">5 Trục cốt lõi</span>
-          </div>
-          <div className="flex-1 bg-surface-container-low rounded-lg border border-outline-variant/30 flex items-center justify-center p-md">
-            {/* SVG Radar Chart Mockup */}
-            <svg viewBox="0 0 200 200" className="w-full h-full max-h-[220px]">
-              {/* Pentagons */}
-              <polygon points="100,20 176,75 147,165 53,165 24,75" fill="none" stroke="#e5e7eb" strokeWidth="1" />
-              <polygon points="100,50 151,87 133,145 67,145 49,87" fill="none" stroke="#e5e7eb" strokeWidth="1" />
-              <polygon points="100,80 126,99 119,125 81,125 74,99" fill="none" stroke="#e5e7eb" strokeWidth="1" />
-              
-              {/* Web Lines */}
-              <line x1="100" y1="100" x2="100" y2="20" stroke="#e5e7eb" strokeWidth="1" />
-              <line x1="100" y1="100" x2="176" y2="75" stroke="#e5e7eb" strokeWidth="1" />
-              <line x1="100" y1="100" x2="147" y2="165" stroke="#e5e7eb" strokeWidth="1" />
-              <line x1="100" y1="100" x2="53" y2="165" stroke="#e5e7eb" strokeWidth="1" />
-              <line x1="100" y1="100" x2="24" y2="75" stroke="#e5e7eb" strokeWidth="1" />
-              
-              {/* Data Shape */}
-              <polygon points="100,35 160,80 135,130 75,150 40,85" fill="rgba(33, 112, 228, 0.2)" stroke="#2170e4" strokeWidth="2" />
-              
-              {/* Data points */}
-              <circle cx="100" cy="35" r="3" fill="#2170e4" />
-              <circle cx="160" cy="80" r="3" fill="#2170e4" />
-              <circle cx="135" cy="130" r="3" fill="#2170e4" />
-              <circle cx="75" cy="150" r="3" fill="#2170e4" />
-              <circle cx="40" cy="85" r="3" fill="#2170e4" />
-
-              {/* Labels */}
-              <text x="100" y="15" textAnchor="middle" fill="#191c1e" className="text-[7px] font-bold">Chuyên môn</text>
-              <text x="180" y="80" textAnchor="start" fill="#191c1e" className="text-[7px] font-bold">Tài liệu</text>
-              <text x="145" y="175" textAnchor="middle" fill="#191c1e" className="text-[7px] font-bold">Tương tác</text>
-              <text x="55" y="175" textAnchor="middle" fill="#191c1e" className="text-[7px] font-bold">Đánh giá</text>
-              <text x="20" y="80" textAnchor="end" fill="#191c1e" className="text-[7px] font-bold">Hỗ trợ</text>
-            </svg>
-          </div>
-        </div>
-      </div>
-
-      {/* AI Insights (Glowing / Sleek effect) */}
-      <div className="bg-inverse-surface rounded-xl p-lg shadow-lg relative overflow-hidden text-background">
-        {/* Glow backdrop light */}
-        <div className="absolute -top-12 -right-12 w-64 h-64 bg-primary rounded-full mix-blend-screen filter blur-[80px] opacity-20"></div>
-        <div className="relative z-10 flex flex-col gap-md">
-          <div className="flex items-center gap-sm">
-            <span className="material-symbols-outlined text-inverse-primary text-2xl">lightbulb</span>
-            <h3 className="font-headline-md text-headline-md text-white font-bold">
-              AI Insight: Gợi ý cải tiến tự động
+        {/* System Status & Server info */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-lg">
+          <div className="bg-surface-container-lowest border border-outline-variant rounded-xl p-lg shadow-sm lg:col-span-2 space-y-md">
+            <h3 className="font-headline-md text-[18px] font-bold text-on-surface flex items-center gap-2">
+              <span className="material-symbols-outlined text-primary">dns</span>
+              Trạng thái máy chủ & kết nối
             </h3>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-md pt-sm">
+              <div className="p-md rounded-lg bg-surface border border-outline-variant flex items-center gap-md">
+                <span className="w-3.5 h-3.5 rounded-full bg-emerald-500 animate-ping"></span>
+                <div>
+                  <p className="text-[13px] text-on-surface-variant">Cơ sở dữ liệu Supabase</p>
+                  <p className="text-[14px] font-bold text-on-surface">Đang kết nối — Khỏe mạnh</p>
+                </div>
+              </div>
+              <div className="p-md rounded-lg bg-surface border border-outline-variant flex items-center gap-md">
+                <span className="w-3.5 h-3.5 rounded-full bg-emerald-500 animate-ping"></span>
+                <div>
+                  <p className="text-[13px] text-on-surface-variant">API Server (FastAPI)</p>
+                  <p className="text-[14px] font-bold text-on-surface">Online — Phản hồi 12ms</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="border-t border-outline-variant/30 pt-md">
+              <h4 className="font-label-md text-on-surface font-semibold mb-sm">Phiên bản phần mềm:</h4>
+              <ul className="space-y-1 text-body-md text-sm text-on-surface-variant">
+                <li>• Frontend: Next.js 16.2.6 (React 19)</li>
+                <li>• Backend: Python 3.12, FastAPI 0.111</li>
+                <li>• Database: Supabase PostgreSQL v15</li>
+              </ul>
+            </div>
           </div>
-          <ul className="grid grid-cols-1 md:grid-cols-2 gap-md mt-sm">
-            <li className="flex items-start gap-md p-md bg-white/5 rounded-lg backdrop-blur-sm border border-white/10 hover:border-white/20 transition-all">
-              <span className="material-symbols-outlined text-tertiary-fixed-dim mt-xs">trending_up</span>
-              <div>
-                <h4 className="font-label-md text-label-md text-white font-bold">
-                  Tăng cường hỗ trợ kỹ thuật
-                </h4>
-                <p className="font-body-md text-sm text-inverse-on-surface opacity-90 mt-1 leading-relaxed">
-                  Phân tích cảm xúc cho thấy 15% sinh viên gặp khó khăn với hệ thống nộp bài trực tuyến. Đề xuất mở thêm kênh hỗ trợ 24/7 trong tuần thi.
-                </p>
-              </div>
-            </li>
-            <li className="flex items-start gap-md p-md bg-white/5 rounded-lg backdrop-blur-sm border border-white/10 hover:border-white/20 transition-all">
-              <span className="material-symbols-outlined text-secondary-fixed-dim mt-xs">info</span>
-              <div>
-                <h4 className="font-label-md text-label-md text-white font-bold">
-                  Điều chỉnh khối lượng bài tập
-                </h4>
-                <p className="font-body-md text-sm text-inverse-on-surface opacity-90 mt-1 leading-relaxed">
-                  Phản hồi từ khoa Kinh tế chỉ ra sự quá tải vào giữa kỳ. Cân nhắc giãn lịch kiểm tra tự luận.
-                </p>
-              </div>
-            </li>
-          </ul>
+
+          {/* Quick Access Card */}
+          <div className="bg-surface-container-lowest border border-outline-variant rounded-xl p-lg shadow-sm flex flex-col gap-md">
+            <h3 className="font-headline-md text-[18px] font-bold text-on-surface flex items-center gap-2">
+              <span className="material-symbols-outlined text-primary">speed</span>
+              Phím tắt quản trị
+            </h3>
+            <p className="text-sm text-on-surface-variant leading-relaxed">
+              Truy cập nhanh các khu vực quản trị tài khoản học viên và danh mục trường lớp.
+            </p>
+            <div className="flex flex-col gap-sm mt-auto">
+              <a
+                href="/admin/users"
+                className="w-full py-2.5 bg-primary text-on-primary hover:bg-primary-container hover:text-on-primary-container text-center rounded-lg font-label-md text-label-md transition-colors"
+              >
+                Quản lý Người dùng
+              </a>
+              <a
+                href="/admin/master-data"
+                className="w-full py-2.5 border border-outline-variant text-on-surface hover:bg-surface-container-low text-center rounded-lg font-label-md text-label-md transition-colors"
+              >
+                Xem Danh mục cơ sở
+              </a>
+            </div>
+          </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  };
+
+  // =============================================================
+  // 2. MANAGER DASHBOARD VIEW
+  // =============================================================
+  const renderManagerDashboard = () => {
+    return (
+      <div className="flex flex-col gap-lg animate-in fade-in duration-300">
+        {/* Page Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-md border-b border-outline-variant/30 pb-md">
+          <div>
+            <h2 className="font-headline-lg text-headline-lg text-primary font-bold">Báo cáo Tổng hợp (QA)</h2>
+            <p className="font-body-md text-body-md text-on-surface-variant mt-xs">
+              Phân tích dữ liệu khảo sát và chất lượng giảng dạy toàn trường
+            </p>
+          </div>
+          <div className="flex items-center gap-sm">
+            <a
+              href="/admin/reports"
+              className="flex items-center gap-sm px-md py-sm rounded-lg border border-outline bg-surface text-primary font-label-md text-label-md hover:bg-surface-container-low transition-colors cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-lg">download</span>
+              Xuất PDF/Excel
+            </a>
+          </div>
+        </div>
+
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-lg">
+          <div className="bg-surface rounded-xl border border-outline-variant p-lg shadow-sm flex items-center justify-between">
+            <div>
+              <p className="font-label-md text-label-md text-on-surface-variant mb-xs">Tổng số Khảo sát</p>
+              <h4 className="font-display-lg text-[36px] text-primary font-bold">{loading ? "..." : stats.total_surveys}</h4>
+              <span className="text-[12px] text-tertiary flex items-center gap-1 mt-1 font-semibold animate-pulse">
+                Đang chạy &amp; nháp
+              </span>
+            </div>
+            <div className="w-14 h-14 rounded-xl bg-primary/8 text-primary flex items-center justify-center">
+              <span className="material-symbols-outlined text-[28px] icon-fill">ballot</span>
+            </div>
+          </div>
+
+          <div className="bg-surface rounded-xl border border-outline-variant p-lg shadow-sm flex items-center justify-between">
+            <div>
+              <p className="font-label-md text-label-md text-on-surface-variant mb-xs">Tổng phản hồi</p>
+              <h4 className="font-display-lg text-[36px] text-tertiary-container font-bold">{loading ? "..." : stats.total_responses}</h4>
+              <span className="text-[12px] text-emerald-600 flex items-center gap-1 mt-1 font-semibold">
+                +12% so với kỳ trước
+              </span>
+            </div>
+            <div className="w-14 h-14 rounded-xl bg-tertiary/8 text-on-tertiary-container flex items-center justify-center">
+              <span className="material-symbols-outlined text-[28px] icon-fill">volunteer_activism</span>
+            </div>
+          </div>
+
+          <div className="bg-surface rounded-xl border border-outline-variant p-lg shadow-sm flex items-center justify-between">
+            <div>
+              <p className="font-label-md text-label-md text-on-surface-variant mb-xs">Giải trình đang chờ</p>
+              <h4 className="font-display-lg text-[36px] text-error font-bold">{loading ? "..." : stats.pending_clarifications}</h4>
+              <span className="text-[12px] text-error flex items-center gap-1 mt-1 font-semibold">
+                Cần phản hồi từ giảng viên
+              </span>
+            </div>
+            <div className="w-14 h-14 rounded-xl bg-error/8 text-error flex items-center justify-center">
+              <span className="material-symbols-outlined text-[28px] icon-fill">pending_actions</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Charts Section */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-lg">
+          {/* Bar chart */}
+          <div className="bg-surface rounded-xl border border-outline-variant p-lg shadow-sm col-span-1 lg:col-span-2 min-h-[360px] flex flex-col">
+            <div className="flex justify-between items-center mb-md">
+              <h3 className="font-label-md text-label-md font-bold text-on-surface">Đánh giá trung bình theo tiêu chí (Cột)</h3>
+              <span className="text-label-sm text-outline-variant font-medium">Học kỳ này</span>
+            </div>
+            <div className="flex-1 bg-surface-container-low rounded-lg border border-outline-variant/30 flex flex-col items-center justify-center p-md">
+              <span className="text-on-surface-variant font-body-md">Chưa có dữ liệu biểu đồ từ hệ thống.</span>
+            </div>
+          </div>
+
+          {/* AI Insights Card */}
+          <div className="bg-inverse-surface rounded-xl p-lg shadow-lg relative overflow-hidden text-background flex flex-col justify-between">
+            <div className="absolute -top-12 -right-12 w-48 h-48 bg-primary rounded-full mix-blend-screen filter blur-[80px] opacity-20 animate-pulse"></div>
+            <div className="relative z-10 flex flex-col gap-md">
+              <div className="flex items-center gap-sm">
+                <span className="material-symbols-outlined text-inverse-primary text-2xl">insights</span>
+                <h3 className="font-headline-md text-headline-md text-white font-bold">Trợ lý AI phân tích</h3>
+              </div>
+              <p className="font-body-md text-sm text-inverse-on-surface opacity-90 leading-relaxed">
+                Sau khi phân tích 1,200 ý kiến phản hồi tự do kỳ này, hệ thống AI đề xuất:
+              </p>
+              <div className="bg-white/5 border border-white/10 rounded-lg p-md text-[13px] leading-relaxed text-white/95">
+                <strong>💡 Đang chờ dữ liệu:</strong> Hệ thống AI đang thu thập thêm dữ liệu để đưa ra phân tích chi tiết.
+              </div>
+            </div>
+            <a
+              href="/admin/reports"
+              className="mt-md text-[13px] font-bold text-inverse-primary hover:opacity-80 flex items-center gap-1 self-start cursor-pointer transition-opacity"
+            >
+              Xem toàn bộ phân tích AI <span className="material-symbols-outlined text-[16px]">arrow_right_alt</span>
+            </a>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // =============================================================
+  // 3. LECTURER DASHBOARD VIEW
+  // =============================================================
+  const renderLecturerDashboard = () => {
+    return (
+      <div className="flex flex-col gap-lg animate-in fade-in duration-300">
+        <div className="flex flex-col gap-sm border-b border-outline-variant/30 pb-md">
+          <h2 className="font-headline-lg text-headline-lg text-primary font-bold">Bảng điều khiển Giảng viên</h2>
+          <p className="font-body-md text-body-md text-on-surface-variant">
+            Xem kết quả đánh giá giảng dạy và giải trình phản hồi trực tiếp từ sinh viên các môn phụ trách.
+          </p>
+        </div>
+
+        {/* Quick evaluation stats */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-lg">
+          <div className="bg-surface rounded-xl border border-outline-variant p-lg shadow-sm flex items-center justify-between">
+            <div>
+              <p className="font-label-md text-label-md text-on-surface-variant mb-xs">Đánh giá chung học kỳ này</p>
+              <h4 className="font-display-lg text-[44px] text-primary font-bold">{loading ? "..." : stats.avg_rating}<span className="text-xl text-on-surface-variant">/5.0</span></h4>
+              <span className="text-[12px] text-emerald-600 flex items-center gap-1 mt-1 font-semibold">
+                <span className="material-symbols-outlined text-[14px]">info</span>
+                Tính toán dựa trên dữ liệu thực tế
+              </span>
+            </div>
+            <div className="w-16 h-16 rounded-full bg-primary/8 text-primary flex items-center justify-center">
+              <span className="material-symbols-outlined text-[32px] icon-fill">star</span>
+            </div>
+          </div>
+
+          <div className="bg-surface rounded-xl border border-outline-variant p-lg shadow-sm flex items-center justify-between">
+            <div>
+              <p className="font-label-md text-label-md text-on-surface-variant mb-xs">Yêu cầu giải trình cần xử lý</p>
+              <h4 className="font-display-lg text-[44px] text-error font-bold">{loading ? "..." : stats.pending_clarifications}</h4>
+            </div>
+            <div className="w-16 h-16 rounded-full bg-error/8 text-error flex items-center justify-center">
+              <span className="material-symbols-outlined text-[32px] icon-fill">gavel</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Subjects taught list */}
+        <div className="bg-surface-container-lowest border border-outline-variant rounded-xl p-lg shadow-sm space-y-md">
+          <h3 className="font-headline-md text-[18px] font-bold text-on-surface flex items-center gap-2">
+            <span className="material-symbols-outlined text-primary">school</span>
+            Môn học giảng dạy trong học kỳ (Học kỳ 1 - 2023/2024)
+          </h3>
+
+          <div className="pt-xs text-on-surface-variant font-body-md">
+            Chưa có dữ liệu môn học được phân công từ hệ thống.
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Switch rendering based on role
+  if (primaryRole === "ADMIN") {
+    return renderAdminDashboard();
+  } else if (primaryRole === "LECTURER") {
+    return renderLecturerDashboard();
+  } else {
+    // MANAGER or QA is default
+    return renderManagerDashboard();
+  }
 }

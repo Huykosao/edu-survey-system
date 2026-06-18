@@ -8,3 +8,4 @@ loguru
 slowapi
 bcrypt
 tzdata
+google-genai

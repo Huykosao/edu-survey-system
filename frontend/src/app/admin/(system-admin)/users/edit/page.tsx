@@ -3,6 +3,7 @@
 import React, { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { usersApi, facultiesApi } from "@/lib/api";
 
 interface UserProfile {
   id: string;
@@ -10,53 +11,14 @@ interface UserProfile {
   email: string;
   phone: string;
   dept: string;
-  role: "student" | "faculty" | "manager" | "admin";
+  role: "student" | "faculty" | "manager" | "admin" | "alumni" | "employer";
   status: "active" | "locked";
 }
-
-const mockUsers: Record<string, UserProfile> = {
-  "1": {
-    id: "1",
-    name: "Nguyễn Văn Hải",
-    email: "hai.nguyen@university.edu",
-    phone: "0901234567",
-    dept: "Khoa Công nghệ Thông tin",
-    role: "student",
-    status: "active",
-  },
-  "2": {
-    id: "2",
-    name: "Trần Thị Mai",
-    email: "mai.tran@faculty.edu",
-    phone: "0912345678",
-    dept: "Khoa Công nghệ Thông tin",
-    role: "faculty",
-    status: "active",
-  },
-  "3": {
-    id: "3",
-    name: "Lê Văn Đức",
-    email: "duc.le@admin.edu",
-    phone: "0987654321",
-    dept: "Phòng Đào tạo",
-    role: "manager",
-    status: "locked",
-  },
-  "4": {
-    id: "4",
-    name: "Phạm Ngọc Anh",
-    email: "anh.pham@university.edu",
-    phone: "0934567890",
-    dept: "Khoa Kinh tế",
-    role: "student",
-    status: "active",
-  },
-};
 
 function EditUserForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const userId = searchParams.get("id") || "2"; // Default to Tran Thi Mai
+  const userId = searchParams.get("id");
 
   const [profile, setProfile] = useState<UserProfile>({
     id: "2",
@@ -71,32 +33,91 @@ function EditUserForm() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
 
-  // Load mock data on init
+  const [loading, setLoading] = useState(true);
+
+  const [faculties, setFaculties] = useState<{ id: number; name: string }[]>([]);
+
+  // Load faculties on init
   useEffect(() => {
-    if (mockUsers[userId]) {
-      setProfile(mockUsers[userId]);
-    }
+    facultiesApi.list()
+      .then((res: any) => setFaculties(res))
+      .catch((err) => console.error("Error loading faculties:", err));
+  }, []);
+
+  // Load real data on init
+  useEffect(() => {
+    if (!userId) return;
+    setLoading(true);
+    usersApi.get(parseInt(userId))
+      .then((res: any) => {
+        let r = "student";
+        if (res.roles && res.roles.length > 0) {
+          if (res.roles[0] === "ADMIN") r = "admin";
+          else if (res.roles[0] === "MANAGER") r = "manager";
+          else if (res.roles[0] === "LECTURER") r = "faculty";
+          else if (res.roles[0] === "STUDENT") r = "student";
+          else if (res.roles[0] === "ALUMNI") r = "alumni";
+          else if (res.roles[0] === "EMPLOYER") r = "employer";
+        }
+        setProfile({
+          id: res.id.toString(),
+          name: res.full_name,
+          email: res.email,
+          phone: res.phone || "",
+          dept: res.faculty_id ? res.faculty_id.toString() : "",
+          role: r as any,
+          status: res.status === "active" ? "active" : "locked",
+        });
+      })
+      .catch((err) => console.error("Error loading user details:", err))
+      .finally(() => setLoading(false));
   }, [userId]);
 
-  const handleSave = () => {
-    setToastMessage("Đã lưu các thay đổi của người dùng thành công!");
-    setTimeout(() => {
-      setToastMessage("");
-      router.push("/admin/users");
-    }, 1500);
+  const handleSave = async () => {
+    if (!userId) return;
+    try {
+      let role_id = 4; // student
+      if (profile.role === "admin") role_id = 1;
+      else if (profile.role === "manager") role_id = 2;
+      else if (profile.role === "faculty") role_id = 3;
+      else if (profile.role === "alumni") role_id = 5;
+      else if (profile.role === "employer") role_id = 6;
+
+      await usersApi.update(parseInt(userId), {
+        full_name: profile.name,
+        role_ids: [role_id],
+        status: profile.status === "active" ? "active" : "inactive",
+        phone: profile.phone || null,
+        faculty_id: profile.dept ? parseInt(profile.dept) : null,
+      });
+
+      setToastMessage("Đã lưu các thay đổi của người dùng thành công!");
+      setTimeout(() => {
+        setToastMessage("");
+        router.push("/admin/users");
+      }, 1500);
+    } catch (err) {
+      console.error("Error saving user:", err);
+    }
   };
 
   const handleCancel = () => {
     router.push("/admin/users");
   };
 
-  const handleDelete = () => {
-    setToastMessage("Tài khoản người dùng đã bị xóa vĩnh viễn.");
-    setShowDeleteConfirm(false);
-    setTimeout(() => {
-      setToastMessage("");
-      router.push("/admin/users");
-    }, 1500);
+  const handleDelete = async () => {
+    if (!userId) return;
+    try {
+      await usersApi.delete(parseInt(userId));
+      setToastMessage("Tài khoản người dùng đã bị xóa vĩnh viễn.");
+      setShowDeleteConfirm(false);
+      setTimeout(() => {
+        setToastMessage("");
+        router.push("/admin/users");
+      }, 1500);
+    } catch (err) {
+      console.error("Error deleting user:", err);
+    }
   };
 
   return (
@@ -140,6 +161,11 @@ function EditUserForm() {
       </div>
 
       {/* Content Grid */}
+      {loading ? (
+        <div className="flex justify-center items-center py-20">
+          <span className="material-symbols-outlined text-4xl text-primary animate-spin">sync</span>
+        </div>
+      ) : (
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-lg items-start mt-md">
         {/* Main Form Area */}
         <div className="lg:col-span-2 space-y-lg">
@@ -199,10 +225,12 @@ function EditUserForm() {
                   onChange={(e) => setProfile({ ...profile, dept: e.target.value })}
                   className="w-full p-3 bg-surface-container-lowest border border-outline-variant rounded-lg text-body-md font-body-md text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
                 >
-                  <option>Khoa Công nghệ Thông tin</option>
-                  <option>Khoa Kinh tế</option>
-                  <option>Phòng Đào tạo</option>
-                  <option>Khác</option>
+                  <option value="">-- Chưa cập nhật --</option>
+                  {faculties.map((f) => (
+                    <option key={f.id} value={f.id.toString()}>
+                      {f.name}
+                    </option>
+                  ))}
                 </select>
               </div>
             </div>
@@ -224,7 +252,7 @@ function EditUserForm() {
                 {
                   id: "faculty",
                   title: "Giảng viên",
-                  desc: "Có thể tạo khảo sát cấp độ lớp học.",
+                  desc: "Có thể đăng ký giải trình và gửi thông tin lớp học.",
                 },
                 {
                   id: "manager",
@@ -235,6 +263,16 @@ function EditUserForm() {
                   id: "admin",
                   title: "Quản trị viên",
                   desc: "Toàn quyền kiểm soát hệ thống.",
+                },
+                {
+                  id: "alumni",
+                  title: "Cựu sinh viên",
+                  desc: "Khảo sát việc làm và chất lượng đào tạo.",
+                },
+                {
+                  id: "employer",
+                  title: "Nhà tuyển dụng",
+                  desc: "Khảo sát nhu cầu và phản hồi doanh nghiệp.",
                 },
               ].map((role) => (
                 <label
@@ -323,6 +361,7 @@ function EditUserForm() {
           </div>
         </div>
       </div>
+      )}
 
       {/* Delete Confirmation Modal */}
       {showDeleteConfirm && (
