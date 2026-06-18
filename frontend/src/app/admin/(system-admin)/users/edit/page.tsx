@@ -21,12 +21,12 @@ function EditUserForm() {
   const userId = searchParams.get("id");
 
   const [profile, setProfile] = useState<UserProfile>({
-    id: "2",
-    name: "Trần Thị Mai",
-    email: "mai.tran@faculty.edu",
-    phone: "0912345678",
-    dept: "Khoa Công nghệ Thông tin",
-    role: "faculty",
+    id: "",
+    name: "",
+    email: "",
+    phone: "",
+    dept: "",
+    role: "student",
     status: "active",
   });
 
@@ -38,7 +38,8 @@ function EditUserForm() {
   const [isDeleting, setIsDeleting] = useState(false);
 
   const [faculties, setFaculties] = useState<{ id: number; name: string }[]>([]);
-  const isIdMismatch = !userId || profile.id !== userId.toString();
+  const [fetchError, setFetchError] = useState(false);
+  const isIdMismatch = fetchError || !userId || profile.id !== userId.toString();
 
   // Load faculties on init
   useEffect(() => {
@@ -47,10 +48,10 @@ function EditUserForm() {
       .catch((err) => console.error("Error loading faculties:", err));
   }, []);
 
-  // Load real data on init
   useEffect(() => {
     if (!userId) return;
     setLoading(true);
+    setFetchError(false);
     usersApi.get(parseInt(userId))
       .then((res: any) => {
         let r = "student";
@@ -72,7 +73,10 @@ function EditUserForm() {
           status: res.status === "active" ? "active" : "locked",
         });
       })
-      .catch((err) => console.error("Error loading user details:", err))
+      .catch((err) => {
+        console.error("Error loading user details:", err);
+        setFetchError(true);
+      })
       .finally(() => setLoading(false));
   }, [userId]);
 
