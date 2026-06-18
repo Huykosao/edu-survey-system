@@ -107,5 +107,6 @@ def get_current_user(
     if user.get("status") == "locked":
         raise HTTPException(status_code=403, detail="Tài khoản đã bị khóa")
 
-    user["roles"] = payload.get("roles") or []
+    from src.repositories.role import get_user_roles
+    user["roles"] = get_user_roles(user_id)
     return user

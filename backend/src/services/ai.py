@@ -1,5 +1,6 @@
 import google.genai as genai
 from google.genai import types
+from loguru import logger
 from src.config import env
 from src.models.gemini import ClassificationResponse, FinalSurveyReport
 from src.repositories import survey as survey_repo

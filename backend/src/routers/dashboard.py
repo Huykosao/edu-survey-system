@@ -20,7 +20,7 @@ router = APIRouter(
 def dashboard_overview(_: dict = Depends(get_current_user)):
     """Thống kê tổng quan hệ thống. [Mọi user đã đăng nhập]"""
     result = supabase_client.rpc("get_dashboard_counts").execute()
-    counts = result.data or {}
+    counts = result.data[0] if isinstance(result.data, list) and result.data else {}
     return {
         "total_users": counts.get("total_users", 0),
         "total_surveys": counts.get("total_surveys", 0),
