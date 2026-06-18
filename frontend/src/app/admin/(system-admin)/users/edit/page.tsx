@@ -38,6 +38,7 @@ function EditUserForm() {
   const [isDeleting, setIsDeleting] = useState(false);
 
   const [faculties, setFaculties] = useState<{ id: number; name: string }[]>([]);
+  const isIdMismatch = !userId || profile.id !== userId.toString();
 
   // Load faculties on init
   useEffect(() => {
@@ -158,8 +159,8 @@ function EditUserForm() {
             </button>
             <button
               onClick={handleSave}
-              disabled={isSaving || isDeleting}
-              className="px-6 py-2 bg-primary text-on-primary rounded-lg text-label-md font-label-md hover:bg-primary-container hover:text-on-primary-container shadow-sm transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+              disabled={isSaving || isDeleting || isIdMismatch}
+              className="px-6 py-2 bg-primary text-on-primary rounded-lg text-label-md font-label-md hover:bg-primary-container hover:text-on-primary-container shadow-sm transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
             >
               {isSaving && (
                 <svg className="animate-spin h-4 w-4 text-current" viewBox="0 0 24 24" fill="none">
@@ -179,7 +180,19 @@ function EditUserForm() {
           <span className="material-symbols-outlined text-4xl text-primary animate-spin">sync</span>
         </div>
       ) : (
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-lg items-start mt-md">
+      <div className="flex flex-col gap-lg mt-md">
+        {isIdMismatch && (
+          <div className="flex items-start gap-3 p-4 bg-error-container/30 border border-error/20 rounded-xl text-on-error-container animate-in fade-in duration-200">
+            <span className="material-symbols-outlined text-error">warning</span>
+            <div>
+              <p className="font-semibold text-sm">Không thể tải thông tin người dùng</p>
+              <p className="text-xs mt-1 text-on-error-container/85">
+                Đã xảy ra lỗi khi tải dữ liệu từ máy chủ hoặc ID người dùng không hợp lệ. Để tránh ghi đè dữ liệu mẫu (data corruption), các thao tác Lưu thay đổi và Xóa tài khoản đã bị vô hiệu hóa.
+              </p>
+            </div>
+          </div>
+        )}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-lg items-start">
         {/* Main Form Area */}
         <div className="lg:col-span-2 space-y-lg">
           {/* Card: Personal Information */}
@@ -342,8 +355,9 @@ function EditUserForm() {
               <button
                 type="button"
                 onClick={() => setProfile({ ...profile, status: profile.status === "active" ? "locked" : "active" })}
-                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                  profile.status === "locked" ? "bg-error" : "bg-outline-variant"
+                disabled={isIdMismatch}
+                className={`relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed ${
+                  isIdMismatch ? "bg-outline-variant cursor-not-allowed" : profile.status === "locked" ? "bg-error cursor-pointer" : "bg-outline-variant cursor-pointer"
                 }`}
               >
                 <span
@@ -366,13 +380,15 @@ function EditUserForm() {
             </p>
             <button
               onClick={() => setShowDeleteConfirm(true)}
-              className="w-full flex items-center justify-center gap-2 bg-error text-on-error py-3 rounded-lg text-label-md font-label-md hover:bg-error/90 transition-colors shadow-sm cursor-pointer"
+              disabled={isSaving || isDeleting || isIdMismatch}
+              className="w-full flex items-center justify-center gap-2 bg-error text-on-error py-3 rounded-lg text-label-md font-label-md hover:bg-error/90 transition-colors shadow-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <span className="material-symbols-outlined text-[20px]">delete_forever</span>
               Xóa vĩnh viễn tài khoản
             </button>
           </div>
         </div>
+      </div>
       </div>
       )}
 
