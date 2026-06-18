@@ -45,7 +45,7 @@ function EditUserForm() {
   useEffect(() => {
     facultiesApi.list()
       .then((res: any) => setFaculties(res))
-      .catch((err) => console.error("Error loading faculties:", err));
+      .catch((err) => console.warn("Error loading faculties:", err?.message || "Unknown error"));
   }, []);
 
   useEffect(() => {
@@ -73,8 +73,7 @@ function EditUserForm() {
           status: res.status === "active" ? "active" : "locked",
         });
       })
-      .catch((err) => {
-        console.error("Error loading user details:", err);
+      .catch(() => {
         setFetchError(true);
       })
       .finally(() => setLoading(false));
@@ -104,8 +103,8 @@ function EditUserForm() {
         setToastMessage("");
         router.push("/admin/users");
       }, 1500);
-    } catch (err) {
-      console.error("Error saving user:", err);
+    } catch (err: any) {
+      console.warn("Error saving user:", err?.message || "Unknown error");
       setIsSaving(false);
     }
   };
@@ -125,8 +124,8 @@ function EditUserForm() {
         setToastMessage("");
         router.push("/admin/users");
       }, 1500);
-    } catch (err) {
-      console.error("Error deleting user:", err);
+    } catch (err: any) {
+      console.warn("Error deleting user:", err?.message || "Unknown error");
       setIsDeleting(false);
     }
   };
@@ -141,62 +140,76 @@ function EditUserForm() {
         </div>
       )}
 
-      {/* Breadcrumb / Back button */}
-      <div>
-        <Link
-          href="/admin/users"
-          className="inline-flex items-center text-on-surface-variant hover:text-primary transition-colors text-label-md font-label-md mb-4"
-        >
-          <span className="material-symbols-outlined mr-1 text-[18px]">arrow_back</span>
-          Quay lại Danh sách Người dùng
-        </Link>
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <h2 className="text-headline-lg font-headline-lg text-on-surface font-bold">
-            Chi tiết &amp; Chỉnh sửa Người dùng
-          </h2>
-          <div className="flex gap-sm">
-            <button
-              onClick={handleCancel}
-              className="px-4 py-2 border border-outline-variant rounded-lg text-label-md font-label-md text-on-surface hover:bg-surface-container-high transition-colors cursor-pointer"
-            >
-              Hủy bỏ
-            </button>
-            <button
-              onClick={handleSave}
-              disabled={isSaving || isDeleting || isIdMismatch}
-              className="px-6 py-2 bg-primary text-on-primary rounded-lg text-label-md font-label-md hover:bg-primary-container hover:text-on-primary-container shadow-sm transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
-            >
-              {isSaving && (
-                <svg className="animate-spin h-4 w-4 text-current" viewBox="0 0 24 24" fill="none">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                </svg>
-              )}
-              <span>{isSaving ? "Đang lưu..." : "Lưu thay đổi"}</span>
-            </button>
-          </div>
-        </div>
-      </div>
 
-      {/* Content Grid */}
+
       {loading ? (
         <div className="flex justify-center items-center py-20">
           <span className="material-symbols-outlined text-4xl text-primary animate-spin">sync</span>
         </div>
+      ) : fetchError ? (
+        <div className="flex justify-center items-center w-full mt-lg py-10">
+          <div className="w-[90%] max-w-[450px] flex flex-col items-center justify-center py-16 px-6 bg-surface-container-lowest border border-outline-variant rounded-2xl shadow-sm text-center animate-in fade-in zoom-in-95 duration-200">
+            <div className="w-16 h-16 bg-error-container text-error rounded-full flex items-center justify-center mb-6">
+              <span className="material-symbols-outlined text-4xl font-bold">person_off</span>
+            </div>
+            <h3 className="text-headline-md font-bold text-on-surface w-full mb-2">
+              Không tìm thấy người dùng
+            </h3>
+            <p className="text-body-md text-on-surface-variant w-full mb-8">
+              Tài khoản có ID <span className="font-semibold text-primary">#{userId}</span> không tồn tại trong hệ thống hoặc đã bị xóa trước đó.
+            </p>
+            <Link
+              href="/admin/users"
+              className="px-6 py-2.5 bg-primary text-on-primary rounded-xl text-label-md font-semibold hover:bg-primary-container hover:text-on-primary-container shadow-md hover:shadow-lg transition-all flex items-center gap-2"
+            >
+              <span className="material-symbols-outlined text-[18px]">arrow_back</span>
+              Quay lại danh sách
+            </Link>
+          </div>
+        </div>
       ) : (
-      <div className="flex flex-col gap-lg mt-md">
-        {isIdMismatch && (
-          <div className="flex items-start gap-3 p-4 bg-error-container/30 border border-error/20 rounded-xl text-on-error-container animate-in fade-in duration-200">
-            <span className="material-symbols-outlined text-error">warning</span>
-            <div>
-              <p className="font-semibold text-sm">Không thể tải thông tin người dùng</p>
-              <p className="text-xs mt-1 text-on-error-container/85">
-                Đã xảy ra lỗi khi tải dữ liệu từ máy chủ hoặc ID người dùng không hợp lệ. Để tránh ghi đè dữ liệu mẫu (data corruption), các thao tác Lưu thay đổi và Xóa tài khoản đã bị vô hiệu hóa.
-              </p>
+        <div className="flex flex-col gap-lg">
+          {/* Header Area */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <h2 className="text-headline-lg font-headline-lg text-on-surface font-bold">
+              Chi tiết &amp; Chỉnh sửa Người dùng
+            </h2>
+            <div className="flex gap-sm">
+              <button
+                onClick={handleCancel}
+                className="px-4 py-2 border border-outline-variant rounded-lg text-label-md font-label-md text-on-surface hover:bg-surface-container-high transition-colors cursor-pointer"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={isSaving || isDeleting || isIdMismatch}
+                className="px-6 py-2 bg-primary text-on-primary rounded-lg text-label-md font-label-md hover:bg-primary-container hover:text-on-primary-container shadow-sm transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+              >
+                {isSaving && (
+                  <svg className="animate-spin h-4 w-4 text-current" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                )}
+                <span>{isSaving ? "Đang lưu..." : "Lưu thay đổi"}</span>
+              </button>
             </div>
           </div>
-        )}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-lg items-start">
+
+          <div className="flex flex-col gap-lg mt-md">
+            {isIdMismatch && (
+              <div className="flex items-start gap-3 p-4 bg-error-container/30 border border-error/20 rounded-xl text-on-error-container animate-in fade-in duration-200">
+                <span className="material-symbols-outlined text-error">warning</span>
+                <div>
+                  <p className="font-semibold text-sm">Không thể tải thông tin người dùng</p>
+                  <p className="text-xs mt-1 text-on-error-container/85">
+                    Đã xảy ra lỗi khi tải dữ liệu từ máy chủ hoặc ID người dùng không hợp lệ. Để tránh ghi đè dữ liệu mẫu (data corruption), các thao tác Lưu thay đổi và Xóa tài khoản đã bị vô hiệu hóa.
+                  </p>
+                </div>
+              </div>
+            )}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-lg items-start">
         {/* Main Form Area */}
         <div className="lg:col-span-2 space-y-lg">
           {/* Card: Personal Information */}
@@ -392,6 +405,7 @@ function EditUserForm() {
             </button>
           </div>
         </div>
+      </div>
       </div>
       </div>
       )}
