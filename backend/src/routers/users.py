@@ -132,10 +132,15 @@ def bulk_create_users(
     
     fac_res = supabase_client.table("faculties").select("id, name").execute()
     faculties_map = {}
+    valid_faculty_ids = set()
     if fac_res.data:
         for f in fac_res.data:
-            if f.get("name"):
-                faculties_map[f["name"].strip().lower()] = f["id"]
+            fid = f.get("id")
+            fname = f.get("name")
+            if fid:
+                valid_faculty_ids.add(fid)
+            if fname:
+                faculties_map[fname.strip().lower()] = fid
     
     success_count = 0
     errors = []
@@ -147,8 +152,7 @@ def bulk_create_users(
                 profile_data["metadata"] = {"phone": user_req.phone}
                 
             if user_req.faculty_id:
-                fac_res = supabase_client.table("faculties").select("id").eq("id", user_req.faculty_id).execute()
-                if not fac_res.data:
+                if user_req.faculty_id not in valid_faculty_ids:
                     raise ValueError(f"Khoa có ID {user_req.faculty_id} không tồn tại trong hệ thống")
                 profile_data["faculty_id"] = user_req.faculty_id
             elif user_req.faculty_name:
