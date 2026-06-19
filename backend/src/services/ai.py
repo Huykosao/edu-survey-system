@@ -69,7 +69,7 @@ def classify_survey_process(survey_id: int, role_id: int = None):
 
     # Nếu không có câu hỏi mở → bỏ qua, không gọi AI
     if not open_questions:
-        print(f"[classify] survey_id={survey_id}: Không có câu hỏi mở, bỏ qua gán nhãn.")
+        logger.info(f"[classify] survey_id={survey_id}: Không có câu hỏi mở, bỏ qua gán nhãn.")
         return 0
 
     # 4. Lấy tất cả câu trả lời
@@ -77,7 +77,7 @@ def classify_survey_process(survey_id: int, role_id: int = None):
 
     # Nếu không có phản hồi nào → bỏ qua, không gọi AI
     if not all_responses:
-        print(f"[classify] survey_id={survey_id}: Không có phản hồi nào, bỏ qua gán nhãn.")
+        logger.info(f"[classify] survey_id={survey_id}: Không có phản hồi nào, bỏ qua gán nhãn.")
         return 0
 
     client = genai.Client(api_key=env.GEMINI_API_KEY)
