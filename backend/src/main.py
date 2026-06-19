@@ -5,8 +5,7 @@ Entry point FastAPI — đăng ký tất cả routers.
 Mỗi router chỉ xử lý HTTP, không chứa business logic.
 """
 
-from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 from slowapi.errors import RateLimitExceeded

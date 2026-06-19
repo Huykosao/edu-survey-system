@@ -111,8 +111,8 @@ export default function ForgotPasswordPage() {
 
         {!isSuccess && (
           <div className="mt-8 text-center border-t border-outline-variant/30 pt-6">
-            <Link href="/login" className="text-[13px] font-semibold text-primary inline-flex items-center gap-1 group">
-              <span className="material-symbols-outlined" style={{ fontSize: '14px', lineHeight: '1' }}>arrow_back</span>
+            <Link href="/login" className="text-[13px] font-semibold text-primary inline-flex items-center gap-1 group hover:no-underline">
+              <span className="material-symbols-outlined" style={{ fontSize: '12px', lineHeight: '1' }}>arrow_back</span>
               <span className="group-hover:underline">Quay lại đăng nhập</span>
             </Link>
           </div>

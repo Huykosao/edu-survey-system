@@ -132,8 +132,16 @@ async function apiFetch<T = unknown>(
 
   if (!res.ok) {
     const errData = await res.json().catch(() => null);
+    let msg = errData?.detail;
+    if (!msg) {
+      if (res.status === 429) {
+        msg = "Bạn đã gửi quá nhiều yêu cầu. Vui lòng thử lại sau ít phút.";
+      } else {
+        msg = `HTTP Error ${res.status}`;
+      }
+    }
     throw new ApiError(
-      errData?.detail || `HTTP Error ${res.status}`,
+      msg,
       res.status,
       errData,
     );
