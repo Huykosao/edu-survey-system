@@ -9,6 +9,7 @@ không nằm rải rác trong các router.
 import os
 import datetime
 import jwt
+from loguru import logger
 
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -20,6 +21,12 @@ from src.core.database import supabase_client
 SECRET_KEY = os.environ.get("JWT_SECRET", "edu-survey-secret-key-change-in-production")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 24 giờ
+
+if SECRET_KEY == "edu-survey-secret-key-change-in-production":
+    logger.warning(
+        "⚠️  JWT_SECRET đang sử dụng giá trị mặc định! "
+        "Đặt biến môi trường JWT_SECRET trong .env trước khi deploy production."
+    )
 
 security = HTTPBearer(auto_error=False)
 
@@ -87,7 +94,12 @@ def get_current_user(
     if not user_id:
         raise HTTPException(status_code=401, detail="Token không hợp lệ")
 
-    result = supabase_client.table("users").select("*").eq("id", user_id).execute()
+    result = (
+        supabase_client.table("users")
+        .select("id, username, email, full_name, status, last_login, created_at")
+        .eq("id", user_id)
+        .execute()
+    )
     if not result.data:
         raise HTTPException(status_code=401, detail="Người dùng không tồn tại")
 

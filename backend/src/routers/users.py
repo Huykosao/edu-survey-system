@@ -2,8 +2,10 @@
 routers/users.py  (v2 — typed request/response models)
 """
 
-from fastapi import APIRouter, Depends, Query, BackgroundTasks
+from fastapi import APIRouter, Depends, Query, BackgroundTasks, HTTPException, Request
 from typing import Optional
+from loguru import logger
+from src.core.limiter import limiter
 
 from src.core.security import get_current_user
 from src.core.middleware import require_admin, require_admin_or_manager
@@ -73,6 +75,10 @@ def create_user(
     """Tạo user mới. [ADMIN]"""
     from src.repositories.user import upsert_profile_details, delete_user
     from src.core.database import supabase_client
+    if req.faculty_id:
+        fac_res = supabase_client.table("faculties").select("id").eq("id", req.faculty_id).execute()
+        if not fac_res.data:
+            raise HTTPException(status_code=400, detail=f"Khoa có ID {req.faculty_id} không tồn tại")
     new_user = create_user_service(req)
     user_id = new_user["id"]
     try:
@@ -106,13 +112,15 @@ def create_user(
             supabase_client.table("profile_details").delete().eq("user_id", user_id).execute()
             delete_user(user_id)
         except Exception as cleanup_err:
-            print(f"Cleanup failed for user {user_id}: {cleanup_err}")
+            logger.error(f"Cleanup failed for user {user_id}: {cleanup_err}")
         raise e
 
 
 @router.post("/users/bulk")
+@limiter.limit("5/hour")
 def bulk_create_users(
     req: BulkCreateUserRequest,
+    request: Request,
     background_tasks: BackgroundTasks,
     _: dict = Depends(require_admin)
 ):
@@ -124,10 +132,15 @@ def bulk_create_users(
     
     fac_res = supabase_client.table("faculties").select("id, name").execute()
     faculties_map = {}
+    valid_faculty_ids = set()
     if fac_res.data:
         for f in fac_res.data:
-            if f.get("name"):
-                faculties_map[f["name"].strip().lower()] = f["id"]
+            fid = f.get("id")
+            fname = f.get("name")
+            if fid:
+                valid_faculty_ids.add(fid)
+            if fname:
+                faculties_map[fname.strip().lower()] = fid
     
     success_count = 0
     errors = []
@@ -139,6 +152,8 @@ def bulk_create_users(
                 profile_data["metadata"] = {"phone": user_req.phone}
                 
             if user_req.faculty_id:
+                if user_req.faculty_id not in valid_faculty_ids:
+                    raise ValueError(f"Khoa có ID {user_req.faculty_id} không tồn tại trong hệ thống")
                 profile_data["faculty_id"] = user_req.faculty_id
             elif user_req.faculty_name:
                 fname_lower = user_req.faculty_name.lower().strip()
@@ -172,7 +187,7 @@ def bulk_create_users(
                     supabase_client.table("profile_details").delete().eq("user_id", user_id).execute()
                     delete_user(user_id)
                 except Exception as cleanup_err:
-                    print(f"Cleanup failed for user {user_id}: {cleanup_err}")
+                    logger.error(f"Cleanup failed for user {user_id}: {cleanup_err}")
                     
             # Extract error message
             err_msg = str(e)
@@ -193,12 +208,19 @@ def bulk_create_users(
 @router.put("/users/{user_id}", response_model=MessageResponse)
 def update_user(user_id: int, req: UpdateUserRequest, _: dict = Depends(require_admin)):
     """Cập nhật thông tin và/hoặc roles của user. [ADMIN]"""
+    if req.faculty_id:
+        from src.core.database import supabase_client
+        fac_res = supabase_client.table("faculties").select("id").eq("id", req.faculty_id).execute()
+        if not fac_res.data:
+            raise HTTPException(status_code=400, detail=f"Khoa có ID {req.faculty_id} không tồn tại")
     return update_user_info(user_id, req.model_dump(exclude_unset=True))
 
 
 @router.delete("/users/{user_id}", response_model=MessageResponse)
-def delete_user_endpoint(user_id: int, _: dict = Depends(require_admin)):
+def delete_user_endpoint(user_id: int, current_user: dict = Depends(require_admin)):
     """Xóa user. [ADMIN]"""
+    if user_id == current_user["id"]:
+        raise HTTPException(status_code=400, detail="Không thể xóa chính tài khoản của bạn")
     delete_user(user_id)
     return {"message": "Xóa người dùng thành công"}
 
@@ -264,5 +286,10 @@ def update_my_profile_details(
     current_user: dict = Depends(get_current_user),
 ):
     """Cập nhật chi tiết profile. [Mọi user đã đăng nhập]"""
+    if req.faculty_id:
+        from src.core.database import supabase_client
+        fac_res = supabase_client.table("faculties").select("id").eq("id", req.faculty_id).execute()
+        if not fac_res.data:
+            raise HTTPException(status_code=400, detail=f"Khoa có ID {req.faculty_id} không tồn tại")
     upsert_profile_details(current_user["id"], req.model_dump(exclude_none=True))
     return {"message": "Cập nhật thành công"}

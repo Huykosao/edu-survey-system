@@ -1,5 +1,6 @@
 import google.genai as genai
 from google.genai import types
+from loguru import logger
 from src.config import env
 from src.models.gemini import ClassificationResponse, FinalSurveyReport
 from src.repositories import survey as survey_repo
@@ -201,9 +202,7 @@ def classify_survey_process(survey_id: int, role_id: int = None):
 
 def generate_trend_analysis(survey_id: int):
 
-    print("\n==============================")
-    print(f"START AI REPORT survey_id={survey_id}")
-    print("==============================\n")
+    logger.info(f"START AI REPORT survey_id={survey_id}")
 
     try:
         from src.services.survey import get_survey_analysis
