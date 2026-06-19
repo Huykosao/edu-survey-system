@@ -154,11 +154,11 @@ def classify_survey_process(survey_id: int, role_id: int = None):
             missing_ids = set(input_ids)  # tracking các ID chưa được trả về
 
             for item in parsed.results:
-                raw_id = item.feedback_id.replace("res_", "")
+                raw_id = item.feedback_id.replace("res_", "").strip()
 
                 # ── Kiểm tra: AI trả về ID không có trong batch đầu vào ──
                 if raw_id not in input_ids:
-                    print(
+                    logger.warning(
                         f"[classify] WARN batch {batch_idx}: AI trả về feedback_id={item.feedback_id} "
                         f"không có trong đầu vào, bỏ qua."
                     )
