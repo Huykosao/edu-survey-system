@@ -271,7 +271,7 @@ def generate_trend_analysis(survey_id: int):
             stype = info.get("question_type")
             total = q_stats.get("total", 0) or 0
             # Số người thực sự phản hồi câu này (không tính bỏ trống)
-            respondents = q_stats.get("respondents", total)
+            respondents = total
 
             if stype == "likert":
                 dist = q_stats.get("score_distribution", {}) or {}
