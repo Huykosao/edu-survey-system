@@ -886,7 +886,7 @@ export default function ReportsPage() {
         </div>
 
         {/* Content Area */}
-        <div className="lg:col-span-3">
+        <div className="lg:col-span-3 min-h-[100vh]">
           {selectedReport ? (
             <div className="space-y-lg">
               {/* Report Title Card */}
@@ -1414,7 +1414,7 @@ export default function ReportsPage() {
 
               {/* Detailed Question Analysis */}
               {isAnalysing ? (
-                <div className="flex flex-col items-center py-32 gap-6 bg-surface-container-lowest rounded-2xl border border-dashed border-outline-variant/50">
+                <div className="flex flex-col items-center justify-center min-h-[500px] gap-6 bg-surface-container-lowest rounded-2xl border border-dashed border-outline-variant/50">
                   <div className="w-14 h-14 border-[5px] border-primary/20 border-t-primary rounded-full animate-spin" />
                   <div className="text-center">
                     <p className="text-on-surface font-black">Hệ thống đang tổng hợp dữ liệu...</p>
