@@ -242,14 +242,14 @@ export default function AdminLayout({
           {/* Logo Title */}
           <Link
             href={roles.includes("ADMIN") ? "/admin/users" : "/admin"}
-            className="flex items-center gap-2.5 group"
+            className="flex items-center gap-2.5 group min-w-0"
           >
-            <div className="w-9 h-9 bg-primary rounded-xl flex items-center justify-center shadow-sm group-hover:shadow-md transition-shadow">
+            <div className="w-9 h-9 bg-primary rounded-xl flex items-center justify-center shadow-sm group-hover:shadow-md transition-shadow shrink-0">
               <span className="material-symbols-outlined text-on-primary text-[20px] icon-fill">
                 school
               </span>
             </div>
-            <div className="flex flex-col">
+            <div className="flex flex-col min-w-0 truncate">
               <span className="text-[16px] font-bold text-primary leading-tight">
                 EduSurvey
               </span>
@@ -261,7 +261,7 @@ export default function AdminLayout({
         </div>
 
         {/* Top bar right actions */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           {/* Notifications */}
           <Link
             href="/admin/notifications"

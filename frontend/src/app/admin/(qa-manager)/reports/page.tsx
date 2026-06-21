@@ -766,7 +766,7 @@ export default function ReportsPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-lg items-start">
         {/* Sidebar: Danh sách khảo sát */}
-        <div className="lg:col-span-1 space-y-sm max-h-[80vh] overflow-y-auto pr-2 sticky top-4 custom-scrollbar">
+        <div className="lg:col-span-1 space-y-sm max-h-[80vh] overflow-y-auto pr-2 lg:sticky lg:top-4 custom-scrollbar">
           {/* Published */}
           <h3 className="text-[10px] font-black uppercase tracking-[0.25em] text-outline px-1 mb-1">
             Đang phát hành

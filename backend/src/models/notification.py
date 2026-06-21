@@ -46,3 +46,5 @@ class DashboardOverviewResponse(BaseModel):
     total_users: int
     total_surveys: int
     total_responses: int
+    pending_clarifications: int = 0
+    avg_rating: float = 0.0
