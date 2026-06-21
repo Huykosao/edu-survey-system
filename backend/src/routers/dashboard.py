@@ -19,12 +19,30 @@ router = APIRouter(
 @router.get("/dashboard/overview", response_model=DashboardOverviewResponse)
 def dashboard_overview(_: dict = Depends(get_current_user)):
     """Thống kê tổng quan hệ thống. [Mọi user đã đăng nhập]"""
-    result = supabase_client.rpc("get_dashboard_counts").execute()
-    counts = result.data[0] if isinstance(result.data, list) and result.data else {}
+    try:
+        result = supabase_client.rpc("get_dashboard_counts").execute()
+        raw_counts = result.data if isinstance(result.data, dict) else (result.data[0] if isinstance(result.data, list) and result.data else {})
+        counts = raw_counts if isinstance(raw_counts, dict) else {}
+        
+        total_users = counts.get("total_users") or 0
+        total_surveys = counts.get("total_surveys") or 0
+        total_responses = counts.get("total_responses") or 0
+        pending_clarifications = counts.get("pending_clarifications") or 0
+        avg_rating = counts.get("avg_rating") or 0.0
+    except Exception as e:
+        print(f"Error counting dashboard via RPC: {e}")
+        total_users = 0
+        total_surveys = 0
+        total_responses = 0
+        pending_clarifications = 0
+        avg_rating = 0.0
+
     return {
-        "total_users": counts.get("total_users", 0),
-        "total_surveys": counts.get("total_surveys", 0),
-        "total_responses": counts.get("total_responses", 0),
+        "total_users": total_users,
+        "total_surveys": total_surveys,
+        "total_responses": total_responses,
+        "pending_clarifications": pending_clarifications,
+        "avg_rating": avg_rating,
     }
 
 

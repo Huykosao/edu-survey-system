@@ -50,7 +50,7 @@ export default function AdminDashboardPage() {
 
         {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-lg">
-          <div className="bg-surface rounded-xl border border-outline-variant p-lg shadow-sm flex items-center justify-between">
+          <div className="bg-surface rounded-xl border border-outline-variant p-lg shadow-sm flex items-center justify-between gap-4">
             <div>
               <p className="font-label-md text-label-md text-on-surface-variant mb-xs">Tổng người dùng</p>
               <h4 className="font-display-lg text-[36px] text-primary font-bold">{loading ? "..." : stats.total_users}</h4>
@@ -58,12 +58,12 @@ export default function AdminDashboardPage() {
                 Tài khoản đang hoạt động
               </span>
             </div>
-            <div className="w-14 h-14 rounded-xl bg-primary/8 text-primary flex items-center justify-center">
+            <div className="w-14 h-14 rounded-xl bg-primary/8 text-primary flex items-center justify-center shrink-0">
               <span className="material-symbols-outlined text-[28px] icon-fill">groups</span>
             </div>
           </div>
 
-          <div className="bg-surface rounded-xl border border-outline-variant p-lg shadow-sm flex items-center justify-between">
+          <div className="bg-surface rounded-xl border border-outline-variant p-lg shadow-sm flex items-center justify-between gap-4">
             <div>
               <p className="font-label-md text-label-md text-on-surface-variant mb-xs">Tổng số Khảo sát</p>
               <h4 className="font-display-lg text-[36px] text-secondary font-bold">{loading ? "..." : stats.total_surveys}</h4>
@@ -71,12 +71,12 @@ export default function AdminDashboardPage() {
                 Được thiết kế bởi Manager
               </span>
             </div>
-            <div className="w-14 h-14 rounded-xl bg-secondary/8 text-secondary flex items-center justify-center">
+            <div className="w-14 h-14 rounded-xl bg-secondary/8 text-secondary flex items-center justify-center shrink-0">
               <span className="material-symbols-outlined text-[28px] icon-fill">assignment_turned_in</span>
             </div>
           </div>
 
-          <div className="bg-surface rounded-xl border border-outline-variant p-lg shadow-sm flex items-center justify-between">
+          <div className="bg-surface rounded-xl border border-outline-variant p-lg shadow-sm flex items-center justify-between gap-4">
             <div>
               <p className="font-label-md text-label-md text-on-surface-variant mb-xs">Phản hồi khảo sát</p>
               <h4 className="font-display-lg text-[36px] text-tertiary font-bold">{loading ? "..." : stats.total_responses}</h4>
@@ -84,7 +84,7 @@ export default function AdminDashboardPage() {
                 Ý kiến đóng góp đã nhận
               </span>
             </div>
-            <div className="w-14 h-14 rounded-xl bg-tertiary/8 text-tertiary flex items-center justify-center">
+            <div className="w-14 h-14 rounded-xl bg-tertiary/8 text-tertiary flex items-center justify-center shrink-0">
               <span className="material-symbols-outlined text-[28px] icon-fill">forum</span>
             </div>
           </div>
@@ -181,7 +181,7 @@ export default function AdminDashboardPage() {
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-lg">
-          <div className="bg-surface rounded-xl border border-outline-variant p-lg shadow-sm flex items-center justify-between">
+          <div className="bg-surface rounded-xl border border-outline-variant p-lg shadow-sm flex items-center justify-between gap-4">
             <div>
               <p className="font-label-md text-label-md text-on-surface-variant mb-xs">Tổng số Khảo sát</p>
               <h4 className="font-display-lg text-[36px] text-primary font-bold">{loading ? "..." : stats.total_surveys}</h4>
@@ -189,12 +189,12 @@ export default function AdminDashboardPage() {
                 Đang chạy &amp; nháp
               </span>
             </div>
-            <div className="w-14 h-14 rounded-xl bg-primary/8 text-primary flex items-center justify-center">
+            <div className="w-14 h-14 rounded-xl bg-primary/8 text-primary flex items-center justify-center shrink-0">
               <span className="material-symbols-outlined text-[28px] icon-fill">ballot</span>
             </div>
           </div>
 
-          <div className="bg-surface rounded-xl border border-outline-variant p-lg shadow-sm flex items-center justify-between">
+          <div className="bg-surface rounded-xl border border-outline-variant p-lg shadow-sm flex items-center justify-between gap-4">
             <div>
               <p className="font-label-md text-label-md text-on-surface-variant mb-xs">Tổng phản hồi</p>
               <h4 className="font-display-lg text-[36px] text-tertiary-container font-bold">{loading ? "..." : stats.total_responses}</h4>
@@ -202,12 +202,12 @@ export default function AdminDashboardPage() {
                 +12% so với kỳ trước
               </span>
             </div>
-            <div className="w-14 h-14 rounded-xl bg-tertiary/8 text-on-tertiary-container flex items-center justify-center">
+            <div className="w-14 h-14 rounded-xl bg-tertiary/8 text-on-tertiary-container flex items-center justify-center shrink-0">
               <span className="material-symbols-outlined text-[28px] icon-fill">volunteer_activism</span>
             </div>
           </div>
 
-          <div className="bg-surface rounded-xl border border-outline-variant p-lg shadow-sm flex items-center justify-between">
+          <div className="bg-surface rounded-xl border border-outline-variant p-lg shadow-sm flex items-center justify-between gap-4">
             <div>
               <p className="font-label-md text-label-md text-on-surface-variant mb-xs">Giải trình đang chờ</p>
               <h4 className="font-display-lg text-[36px] text-error font-bold">{loading ? "..." : stats.pending_clarifications}</h4>
@@ -215,7 +215,7 @@ export default function AdminDashboardPage() {
                 Cần phản hồi từ giảng viên
               </span>
             </div>
-            <div className="w-14 h-14 rounded-xl bg-error/8 text-error flex items-center justify-center">
+            <div className="w-14 h-14 rounded-xl bg-error/8 text-error flex items-center justify-center shrink-0">
               <span className="material-symbols-outlined text-[28px] icon-fill">pending_actions</span>
             </div>
           </div>
@@ -229,8 +229,10 @@ export default function AdminDashboardPage() {
               <h3 className="font-label-md text-label-md font-bold text-on-surface">Đánh giá trung bình theo tiêu chí (Cột)</h3>
               <span className="text-label-sm text-outline-variant font-medium">Học kỳ này</span>
             </div>
-            <div className="flex-1 bg-surface-container-low rounded-lg border border-outline-variant/30 flex flex-col items-center justify-center p-md">
-              <span className="text-on-surface-variant font-body-md">Chưa có dữ liệu biểu đồ từ hệ thống.</span>
+            <div className="flex-1 bg-surface-container-low rounded-lg border border-outline-variant/30 flex flex-col items-center justify-center p-md text-center">
+              <span className="material-symbols-outlined text-[48px] text-outline-variant mb-sm">construction</span>
+              <h4 className="font-label-md font-bold text-on-surface">Tính năng đang phát triển</h4>
+              <span className="text-on-surface-variant font-body-sm mt-xs">Biểu đồ đánh giá theo tiêu chí sẽ sớm được cập nhật</span>
             </div>
           </div>
 
@@ -276,26 +278,29 @@ export default function AdminDashboardPage() {
 
         {/* Quick evaluation stats */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-lg">
-          <div className="bg-surface rounded-xl border border-outline-variant p-lg shadow-sm flex items-center justify-between">
+          <div className="bg-surface rounded-xl border border-outline-variant p-lg shadow-sm flex items-center justify-between gap-4">
             <div>
               <p className="font-label-md text-label-md text-on-surface-variant mb-xs">Đánh giá chung học kỳ này</p>
-              <h4 className="font-display-lg text-[44px] text-primary font-bold">{loading ? "..." : stats.avg_rating}<span className="text-xl text-on-surface-variant">/5.0</span></h4>
+              <h4 className="font-display-lg text-[44px] text-primary font-bold">
+                {loading ? "..." : (stats.avg_rating > 0 ? stats.avg_rating : "--")}
+                <span className="text-xl text-on-surface-variant">/5.0</span>
+              </h4>
               <span className="text-[12px] text-emerald-600 flex items-center gap-1 mt-1 font-semibold">
                 <span className="material-symbols-outlined text-[14px]">info</span>
-                Tính toán dựa trên dữ liệu thực tế
+                {stats.avg_rating > 0 ? "Tính toán dựa trên dữ liệu thực tế" : "Đang cập nhật dữ liệu"}
               </span>
             </div>
-            <div className="w-16 h-16 rounded-full bg-primary/8 text-primary flex items-center justify-center">
+            <div className="w-16 h-16 rounded-full bg-primary/8 text-primary flex items-center justify-center shrink-0">
               <span className="material-symbols-outlined text-[32px] icon-fill">star</span>
             </div>
           </div>
 
-          <div className="bg-surface rounded-xl border border-outline-variant p-lg shadow-sm flex items-center justify-between">
+          <div className="bg-surface rounded-xl border border-outline-variant p-lg shadow-sm flex items-center justify-between gap-4">
             <div>
               <p className="font-label-md text-label-md text-on-surface-variant mb-xs">Yêu cầu giải trình cần xử lý</p>
               <h4 className="font-display-lg text-[44px] text-error font-bold">{loading ? "..." : stats.pending_clarifications}</h4>
             </div>
-            <div className="w-16 h-16 rounded-full bg-error/8 text-error flex items-center justify-center">
+            <div className="w-16 h-16 rounded-full bg-error/8 text-error flex items-center justify-center shrink-0">
               <span className="material-symbols-outlined text-[32px] icon-fill">gavel</span>
             </div>
           </div>
